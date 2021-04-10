@@ -1,9 +1,11 @@
 package it.unipd.dei.yeagerists.index;
 
 
+import it.unipd.dei.yeagerists.parse.ArgsParser;
 import it.unipd.dei.yeagerists.parse.DocumentParser;
 import it.unipd.dei.yeagerists.parse.ParsedDocument;
 import lombok.NonNull;
+import lombok.extern.java.Log;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
@@ -19,17 +21,12 @@ import java.nio.charset.Charset;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 
-@Slf4j
+@Log
 public class DirectoryIndexer {
 
     private static final int MBYTE = 1024 * 1024;
 
     private final IndexWriter writer;
-
-    /**
-     * The class of the {@code DocumentParser} to be used.
-     */
-    private final Class<? extends DocumentParser> parserClass;
 
     /**
      * The directory (and sub-directories) where documents are stored.
@@ -44,7 +41,7 @@ public class DirectoryIndexer {
     /**
      * The charset used for encoding documents.
      */
-    private final Charset cs;
+    private final Charset charset;
 
     /**
      * The start instant of the indexing.
@@ -65,7 +62,6 @@ public class DirectoryIndexer {
      * @param docsPath        the directory from which documents have to be read.
      * @param extension       the extension of the files to be indexed.
      * @param charsetName     the name of the charset used for encoding documents.
-     * @param parserClass           the class of the {@code DocumentParser} to be used.
      * @throws NullPointerException     if any of the parameters is {@code null}.
      * @throws IllegalArgumentException if any of the parameters assumes invalid values.
      */
@@ -76,8 +72,7 @@ public class DirectoryIndexer {
             @NonNull final String indexPath,
             @NonNull final String docsPath,
             @NonNull final String extension,
-            @NonNull final String charsetName,
-            @NonNull final Class<? extends DocumentParser> parserClass) {
+            @NonNull final String charsetName) {
 
         if (ramBufferSizeMB <= 0) {
             throw new IllegalArgumentException("RAM buffer size cannot be less than or equal to zero.");
@@ -98,8 +93,6 @@ public class DirectoryIndexer {
         if (charsetName.isEmpty()) {
             throw new IllegalArgumentException("Charset name cannot be empty.");
         }
-
-        this.parserClass = parserClass;
 
         final IndexWriterConfig iwc = new IndexWriterConfig(analyzer);
         iwc.setSimilarity(similarity);
@@ -146,7 +139,7 @@ public class DirectoryIndexer {
         this.extension = extension;
 
         try {
-            cs = Charset.forName(charsetName);
+            charset = Charset.forName(charsetName);
         } catch (Exception e) {
             throw new IllegalArgumentException(String.format("Unable to create charset %s: %s.", charsetName, e.getMessage()), e);
         }
@@ -167,23 +160,31 @@ public class DirectoryIndexer {
 
     public void index() throws IOException {
 
-        System.out.printf("%n#### Start indexing ####%n");
+        log.info("%n#### Start indexing ####%n");
 
         Files.walkFileTree(docsDir, new SimpleFileVisitor<Path>() {
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                if (file.getFileName().toString().endsWith(extension)) {
-                    System.out.printf("Ignoring file: %s", file.getFileName().toString());
+                if (!file.getFileName().toString().endsWith(extension)) {
+                    log.warning(String.format("Ignoring file: %s", file.getFileName().toString()));
                     return FileVisitResult.CONTINUE;
                 }
 
-                DocumentParser dp = DocumentParser.create(parserClass, Files.newBufferedReader(file, cs));
+                ArgsParser parser = new ArgsParser(Files.newBufferedReader(file, charset));
+
                 bytesCount += attrs.size();
                 filesCount += 1;
 
                 Document doc = null;
 
-                for (ParsedDocument pd : dp) {
+                for (ParsedDocument pd : parser) {
+
+                    if (!pd.isValid()) {
+
+                        log.warning(String.format("Skipping invalid doc in file %s with id %s, body %s",
+                                file.getFileName().toString(),pd.getIdentifier(), pd.getBody()));
+                        continue;
+                    }
 
                     doc = new Document();
 
@@ -199,9 +200,9 @@ public class DirectoryIndexer {
 
                     // print progress every 10000 indexed documents
                     if (docsCount % 10000 == 0) {
-                        System.out.printf("%d document(s) (%d files, %d Mbytes) indexed in %d seconds.%n",
+                        log.info(String.format("%d document(s) (%d files, %d Mbytes) indexed in %d seconds.\n\n",
                                 docsCount, filesCount, bytesCount / MBYTE,
-                                (System.currentTimeMillis() - start) / 1000);
+                                (System.currentTimeMillis() - start) / 1000));
                     }
                 }
 
@@ -213,9 +214,9 @@ public class DirectoryIndexer {
 
         writer.close();
 
-        System.out.printf("%d document(s) (%d files, %d Mbytes) indexed in %d seconds.%n", docsCount, filesCount,
-                bytesCount / MBYTE, (System.currentTimeMillis() - start) / 1000);
+        log.info(String.format("%d document(s) (%d files, %d Mbytes) indexed in %d seconds.%n", docsCount, filesCount,
+                bytesCount / MBYTE, (System.currentTimeMillis() - start) / 1000));
 
-        System.out.printf("#### Indexing complete ####%n");
+        log.info("#### Indexing complete ####%n");
     }
 }

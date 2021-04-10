@@ -20,18 +20,8 @@ public class ParsedDocument {
      * @param id   the unique document identifier.
      * @param body the body of the document.
      * @throws NullPointerException  if {@code id} and/or {@code body} are {@code null}.
-     * @throws IllegalStateException if {@code id} and/or {@code body} are empty.
      */
     public ParsedDocument(@NonNull final String id, @NonNull final String body) {
-
-        if (id.isEmpty()) {
-            throw new IllegalStateException("Document identifier cannot be empty.");
-        }
-
-        if (body.isEmpty()) {
-            throw new IllegalStateException("Document body cannot be empty.");
-        }
-
         this.id = id;
         this.body = body;
     }
@@ -42,6 +32,10 @@ public class ParsedDocument {
 
     public String getBody() {
         return body;
+    }
+
+    public boolean isValid() {
+        return !body.isEmpty() && !id.isEmpty();
     }
 
 
