@@ -1,6 +1,6 @@
 package it.unipd.dei.yeagerists.index;
 
-import it.unipd.dei.yeagerists.parse.ParsedDocument;
+import it.unipd.dei.yeagerists.parse.ParsedArgument;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.FieldType;
 import org.apache.lucene.index.IndexOptions;
@@ -22,6 +22,6 @@ public class BodyField extends Field {
      * @param value the contents of the body of a document.
      */
     public BodyField(final String value) {
-        super(ParsedDocument.FIELDS.BODY, value, BODY_TYPE);
+        super(ParsedArgument.FIELDS.BODY, value, BODY_TYPE);
     }
 }

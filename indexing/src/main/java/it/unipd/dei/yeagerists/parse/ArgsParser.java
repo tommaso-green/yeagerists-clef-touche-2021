@@ -5,18 +5,16 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.core.io.SerializedString;
 import lombok.extern.java.Log;
-import lombok.extern.slf4j.Slf4j;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.Reader;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 @Log
-public class ArgsParser implements Iterator<ParsedDocument>, Iterable<ParsedDocument> {
+public class ArgsParser implements Iterator<ParsedArgument>, Iterable<ParsedArgument> {
 
-    private ParsedDocument document;
+    private ParsedArgument document;
     JsonParser parser;
 
     public ArgsParser(Reader in) {
@@ -48,7 +46,7 @@ public class ArgsParser implements Iterator<ParsedDocument>, Iterable<ParsedDocu
     }
 
     @Override
-    public final Iterator<ParsedDocument> iterator() {
+    public final Iterator<ParsedArgument> iterator() {
         return this;
     }
 
@@ -58,7 +56,7 @@ public class ArgsParser implements Iterator<ParsedDocument>, Iterable<ParsedDocu
     }
 
     @Override
-    public final ParsedDocument next() {
+    public final ParsedArgument next() {
 
         if (!hasNext()) {
             throw new NoSuchElementException("No more documents to parse.");
@@ -81,7 +79,7 @@ public class ArgsParser implements Iterator<ParsedDocument>, Iterable<ParsedDocu
 
     }
 
-    private ParsedDocument parse() throws IOException {
+    private ParsedArgument parse() throws IOException {
         String id = null, body = null;
 
         if (parser.getCurrentToken() != JsonToken.START_OBJECT)
@@ -130,6 +128,6 @@ public class ArgsParser implements Iterator<ParsedDocument>, Iterable<ParsedDocu
 
         // Move to next argument - if no argument next token will be END_ARRAY
         parser.nextToken();
-        return new ParsedDocument(id, body);
+        return new ParsedArgument(id, body);
     }
 }

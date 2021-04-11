@@ -2,11 +2,9 @@ package it.unipd.dei.yeagerists.index;
 
 
 import it.unipd.dei.yeagerists.parse.ArgsParser;
-import it.unipd.dei.yeagerists.parse.DocumentParser;
-import it.unipd.dei.yeagerists.parse.ParsedDocument;
+import it.unipd.dei.yeagerists.parse.ParsedArgument;
 import lombok.NonNull;
 import lombok.extern.java.Log;
-import lombok.extern.slf4j.Slf4j;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
@@ -177,22 +175,22 @@ public class DirectoryIndexer {
 
                 Document doc = null;
 
-                for (ParsedDocument pd : parser) {
+                for (ParsedArgument arg : parser) {
 
-                    if (!pd.isValid()) {
+                    if (!arg.isValid()) {
 
                         log.warning(String.format("Skipping invalid doc in file %s with id %s, body %s",
-                                file.getFileName().toString(),pd.getIdentifier(), pd.getBody()));
+                                file.getFileName().toString(),arg.getId(), arg.getBody()));
                         continue;
                     }
 
                     doc = new Document();
 
                     // add the document identifier
-                    doc.add(new StringField(ParsedDocument.FIELDS.ID, pd.getIdentifier(), Field.Store.YES));
+                    doc.add(new StringField(ParsedArgument.FIELDS.ID, arg.getId(), Field.Store.YES));
 
                     // add the document body
-                    doc.add(new BodyField(pd.getBody()));
+                    doc.add(new BodyField(arg.getBody()));
 
                     writer.addDocument(doc);
 
