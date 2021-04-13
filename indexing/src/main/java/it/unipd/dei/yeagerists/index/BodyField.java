@@ -8,12 +8,13 @@ import org.apache.lucene.index.IndexOptions;
 
 public class BodyField extends Field {
 
-    private static final FieldType BODY_TYPE = new FieldType();
+    private static final FieldType TYPE = new FieldType();
 
     static {
-        BODY_TYPE.setIndexOptions(IndexOptions.DOCS_AND_FREQS);
-        BODY_TYPE.setTokenized(true);
-        BODY_TYPE.setStored(false);
+        TYPE.setIndexOptions(IndexOptions.DOCS_AND_FREQS);
+        TYPE.setTokenized(true);
+        TYPE.setStored(true);
+        TYPE.freeze();
     }
 
     /**
@@ -22,6 +23,6 @@ public class BodyField extends Field {
      * @param value the contents of the body of a document.
      */
     public BodyField(final String value) {
-        super(ParsedArgument.FIELDS.BODY, value, BODY_TYPE);
+        super(ParsedArgument.FIELDS.BODY, value, TYPE);
     }
 }
