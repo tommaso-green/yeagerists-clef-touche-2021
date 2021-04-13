@@ -1,3 +1,4 @@
+import itertools
 import os
 import urllib
 
@@ -46,12 +47,14 @@ def _infer_pos_tags(tokens):
 def _convert_nltk_to_wordnet_tag(pos_tag):
     if pos_tag.startswith("N"):
         return wn.NOUN
-    if pos_tag.startswith("V"):
-        return wn.VERB
-    if pos_tag.startswith("R"):
-        return wn.ADV
-    if pos_tag.startswith("J"):
-        return wn.ADJ
+    # elif pos_tag.startswith("V"):
+    #     return wn.VERB
+    # elif pos_tag.startswith("R"):
+    #     return wn.ADV
+    # elif pos_tag.startswith("J"):
+    #     return wn.ADJ
+    else:
+        return None
 
 
 def main():
@@ -61,8 +64,9 @@ def main():
     topic_list = get_topic_list(filename)
     print(f"Topics parsing completed. Starting with task #{task}.\n")
 
-    num_query_submitted = 10
+    num_query_submitted = 1
 
+    # Text generation with GPT-2 and both positive and negative prompts
     if task == 0:
         tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
         model = GPT2LMHeadModel.from_pretrained('gpt2')
@@ -115,9 +119,9 @@ def main():
             results.append(result)
             # print(f"label: {results['label']}, with score: {round(results['score'], 4)}")
 
-# Back-Translation (aka Spinning):
-# uses a machine translation model to translate a sentence into a foreign language and back again into the original one.
-# N.B. Not to be used in final implementation because it sends http requests to Google Translate servers...
+    # Back-Translation (aka Spinning):
+    # uses a translation model to translate a sentence into a foreign language and back again into the original one.
+    # N.B. Not to be used in final implementation because it sends http requests to Google Translate servers...
     elif task == 2:
         for query in topic_list[:num_query_submitted]:
             print(query)
@@ -137,8 +141,8 @@ def main():
             #     print(spinned_query)
             print()
 
-# Substituting Synonyms with Part-Of-Speech (POS) filtering:
-# pick a word in the sentence and replace with one of its synonyms.
+    # Substituting Synonyms with Part-Of-Speech (POS) filtering:
+    # pick a word in the sentence and replace with one of its synonyms.
     elif task == 3:
         # Download required datasets
         nltk.download('wordnet')
@@ -147,21 +151,63 @@ def main():
 
         for query in topic_list[:num_query_submitted]:
             tokenized_query = nltk.word_tokenize(query)
-            print(tokenized_query)
+            print("tokenized_query: ", tokenized_query)
 
             pos_tags_wn = nltk.pos_tag(tokenized_query)
-            print(pos_tags_wn)
+            print("pos_tages for WordNet: ", pos_tags_wn)
 
+            new_queries = list()
+            query_synonyms_list = list()
             for pos_tag_wn in pos_tags_wn:
-                synonyms_list = synonyms(pos_tag_wn[0], _convert_nltk_to_wordnet_tag(pos_tag_wn[1]))
-                print(synonyms_list)
-            # pos_tags = _infer_pos_tags(tokenized_query)
-            # print(pos_tags)
-            #
-            # for pos_tag in pos_tags:
-            #     synonyms_list = synonyms(str(pos_tags[0]), str(pos_tags[1]))
+                # synonyms_list = synonyms(pos_tag_wn[0], _convert_nltk_to_wordnet_tag(pos_tag_wn[1]))
 
-        print()
+                # We want to replace only nouns with synonyms (all other POS return None)
+                converted_pos_tag = _convert_nltk_to_wordnet_tag(pos_tag_wn[1])
+                if converted_pos_tag is not None:
+                    synonyms_list = synonyms(pos_tag_wn[0], converted_pos_tag)
+                    # Preprocess each synonym of the list so that there are no duplicates with capital letters
+                    synonyms_list = list(_clean_word(synonym) for synonym in synonyms_list)
+                    query_synonyms_list.append(synonyms_list)
+                else:
+                    query_synonyms_list.append([])
+
+            # Add to the synonyms list also the original words
+            for i in range(len(pos_tags_wn)):
+                query_synonyms_list[i].insert(0, pos_tags_wn[i][0])
+                query_synonyms_list[i] = list(dict.fromkeys(query_synonyms_list[i]))        # Remove duplicate tokens
+
+            print("Current query synonyms list: ", query_synonyms_list)
+            print()
+
+            # Compose all queries obtained combining the new synonyms
+            # has_tokens_ended = False
+            # while not has_tokens_ended:
+            #     new_query = ""
+            #     has_tokens_ended = True
+            #     for i in range(len(query_synonyms_list)):
+            #         if len(query_synonyms_list[i]) == 1:                                    # No synonyms were found
+            #             new_query += " "
+            #             new_query += query_synonyms_list[i][0]
+            #         elif len(query_synonyms_list[i]) == 0:                                  # This should not happen
+            #             print("Error: no tokens found to build a query!")
+            #         else:                                                                   # Take a synonym from list
+            #             new_query += " "
+            #             new_query += query_synonyms_list[i].pop()
+            #             if len(query_synonyms_list[i]) == 1:
+            #                 has_tokens_ended = True
+            #             else:
+            #                 has_tokens_ended = False
+            #
+            #     print(new_query)
+
+            # print(list(itertools.combinations(query_synonyms_list, len(query_synonyms_list))))
+
+            # Compose all queries obtained combining the new synonyms
+            all_new_queries_list = list(itertools.product(*query_synonyms_list))
+            all_new_queries = list(" ".join(new_query) for new_query in all_new_queries_list)
+            # Just print all the resulting new queries (the first one should be the original)
+            for new_query in all_new_queries:
+                print(new_query)
 
 
 if __name__ == "__main__":
