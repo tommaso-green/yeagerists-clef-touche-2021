@@ -64,7 +64,7 @@ def main():
     topic_list = get_topic_list(filename)
     print(f"Topics parsing completed. Starting with task #{task}.\n")
 
-    num_query_submitted = 1
+    num_query_submitted = 10
 
     # Text generation with GPT-2 and both positive and negative prompts
     if task == 0:
@@ -149,6 +149,7 @@ def main():
         nltk.download('punkt')
         nltk.download('averaged_perceptron_tagger')
 
+        all_new_queries_list = list()
         for query in topic_list[:num_query_submitted]:
             tokenized_query = nltk.word_tokenize(query)
             print("tokenized_query: ", tokenized_query)
@@ -203,11 +204,17 @@ def main():
             # print(list(itertools.combinations(query_synonyms_list, len(query_synonyms_list))))
 
             # Compose all queries obtained combining the new synonyms
-            all_new_queries_list = list(itertools.product(*query_synonyms_list))
-            all_new_queries = list(" ".join(new_query) for new_query in all_new_queries_list)
-            # Just print all the resulting new queries (the first one should be the original)
-            for new_query in all_new_queries:
+            new_queries_list = list(itertools.product(*query_synonyms_list))
+            new_queries_strings = list(" ".join(new_query) for new_query in new_queries_list)
+
+            # Add to the list of new queries for all original queries
+            all_new_queries_list.append(new_queries_strings)
+
+        # Just print all the resulting new queries (the first one should be the original)
+        for new_query_list in all_new_queries_list:
+            for new_query in new_query_list:
                 print(new_query)
+            print()
 
 
 if __name__ == "__main__":
