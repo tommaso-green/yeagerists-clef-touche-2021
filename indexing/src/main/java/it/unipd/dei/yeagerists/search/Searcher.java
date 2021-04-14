@@ -39,6 +39,7 @@ public class Searcher {
      * The fields of the typical TREC topics.
      */
     private static final class TOPIC_FIELDS {
+        public static final String ID = "number";
         public static final String TITLE = "title";
         public static final String DESCRIPTION = "description";
         public static final String NARRATIVE = "narrative";
@@ -119,12 +120,7 @@ public class Searcher {
         searcher.setSimilarity(similarity);
 
         try {
-            //BufferedReader in = Files.newBufferedReader(Paths.get(topicsFile), StandardCharsets.UTF_8);
-
             topics = parseTopics(topicsFile);
-
-
-            // in.close();
         } catch (IOException e) {
             throw new IllegalArgumentException(
                     String.format("Unable to process topic file %s: %s.", topicsFile, e.getMessage()), e);
@@ -168,7 +164,7 @@ public class Searcher {
     }
 
     /**
-     * /** Searches for the specified topics.
+     * Searches for the specified topics.
      *
      * @throws IOException    if something goes wrong while searching.
      * @throws ParseException if something goes wrong while parsing topics.
@@ -229,6 +225,12 @@ public class Searcher {
         log.info("#### Searching complete ####%n");
     }
 
+    /**
+     * Parse CLEF topics file (XML format)
+     * @param file path to the topics file
+     * @return list of QualityQueries with ID equal to the topic number, and title equal to the query body
+     * @throws IOException if a reading error occurs
+     */
     private List<QualityQuery> parseTopics(String file) throws IOException {
         ArrayList<QualityQuery> res = new ArrayList<>();
         DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
@@ -241,27 +243,23 @@ public class Searcher {
 
             // optional, but recommended
             doc.getDocumentElement().normalize();
-
-            System.out.println("Root Element :" + doc.getDocumentElement().getNodeName());
-            System.out.println("------");
-
-            // get <staff>
             NodeList list = doc.getElementsByTagName("topic");
 
-            for (int temp = 0; temp < list.getLength(); temp++) {
+            // iterate over topics
+            for (int i = 0; i < list.getLength(); i++) {
 
                 HashMap<String,String> fields = new HashMap<>();
 
-                Node node = list.item(temp);
+                Node node = list.item(i);
 
                 if (node.getNodeType() == Node.ELEMENT_NODE) {
 
                     Element element = (Element) node;
 
-                    String id = element.getElementsByTagName("number").item(0).getTextContent();
-                    String title = element.getElementsByTagName("title").item(0).getTextContent();
+                    String id = element.getElementsByTagName(TOPIC_FIELDS.ID).item(0).getTextContent();
+                    String title = element.getElementsByTagName(TOPIC_FIELDS.TITLE).item(0).getTextContent();
 
-                    fields.put("title", title);
+                    fields.put(TOPIC_FIELDS.TITLE, title);
 
                     QualityQuery topic = new QualityQuery(id, fields);
                     res.add(topic);
