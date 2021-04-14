@@ -168,7 +168,13 @@ public class DirectoryIndexer {
                     return FileVisitResult.CONTINUE;
                 }
 
-                ArgsParser parser = new ArgsParser(Files.newBufferedReader(file, charset));
+                ArgsParser parser = null;
+                try {
+                     parser = new ArgsParser(Files.newBufferedReader(file, charset));
+                } catch (IllegalArgumentException e) {
+                    log.severe(String.format("Couldn't parse file %s: %s", file.getFileName().toString(), e.getMessage()));
+                    return FileVisitResult.CONTINUE;
+                }
 
                 bytesCount += attrs.size();
                 filesCount += 1;

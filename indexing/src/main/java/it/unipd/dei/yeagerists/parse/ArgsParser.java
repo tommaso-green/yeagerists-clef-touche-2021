@@ -17,24 +17,24 @@ public class ArgsParser implements Iterator<ParsedArgument>, Iterable<ParsedArgu
     private ParsedArgument document;
     JsonParser parser;
 
-    public ArgsParser(Reader in) {
+    public ArgsParser(Reader in) throws IllegalArgumentException {
         JsonFactory jsonFactory = new JsonFactory();
         try {
             this.parser = jsonFactory.createParser(in);
 
             if (parser.nextToken() != JsonToken.START_OBJECT) {
                 log.severe("input doesn't start with '{'");
-                return;
+                throw new IllegalStateException("Input file doesn't start with '{'");
             }
 
             if (!parser.nextFieldName(new SerializedString("arguments"))) {
                 log.severe("input doesn't contain arguments");
-                return;
+                throw new IllegalStateException("input doesn't contain arguments");
             }
 
             if (parser.nextToken() != JsonToken.START_ARRAY) {
                 log.severe("input doesn't contain an array of arguments");
-                return;
+                throw new IllegalStateException("input doesn't contain an array of arguments");
             }
 
             // Move to first object of array (i.e. first argument) - if no arguments next token will be END_ARRAY
@@ -73,7 +73,7 @@ public class ArgsParser implements Iterator<ParsedArgument>, Iterable<ParsedArgu
                     parser.close();
                 }
             } catch (IOException e) {
-                throw new IllegalStateException("Unable to close the reader.", e);
+                log.warning(String.format("Unable to close the reader: %", e.getMessage()));
             }
         }
 
