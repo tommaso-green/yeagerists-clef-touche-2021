@@ -9,6 +9,7 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.StringField;
+import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.search.similarities.Similarity;
@@ -18,6 +19,8 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.HashSet;
+import java.util.Set;
 
 @Log
 public class DirectoryIndexer {
@@ -160,6 +163,9 @@ public class DirectoryIndexer {
 
         log.info("%n#### Start indexing ####%n");
 
+        // Stores the IDs of parsed documents
+        Set<String> argsIdSet = new HashSet<>();
+
         Files.walkFileTree(docsDir, new SimpleFileVisitor<Path>() {
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
@@ -180,22 +186,31 @@ public class DirectoryIndexer {
                 filesCount += 1;
 
                 Document doc = null;
+                argsIdSet.clear();
 
                 for (ParsedArgument arg : parser) {
 
                     if (!arg.isValid()) {
-
-                        log.warning(String.format("Skipping invalid doc in file %s with id %s, body %s",
-                                file.getFileName().toString(),arg.getId(), arg.getBody()));
+                        log.warning(String.format("Skipping invalid doc in file %s: %s",
+                                file.getFileName().toString(), arg.toString()));
                         continue;
                     }
+
+                    if (argsIdSet.contains(arg.getId())) {
+                        log.warning(String.format("Found multiple arguments with the same id %s. The arg will be ignored ", arg.getId()));
+                        continue;
+                    }
+                    argsIdSet.add(arg.getId());
 
                     doc = new Document();
 
                     // add the document identifier
                     doc.add(new StringField(ParsedArgument.FIELDS.ID, arg.getId(), Field.Store.YES));
 
-                    // add the document body
+                    // add stance (pro/con)
+                    doc.add(new TextField(ParsedArgument.FIELDS.STANCE, arg.getStance(), Field.Store.YES));
+
+                    // add the document text
                     doc.add(new BodyField(arg.getBody()));
 
                     writer.addDocument(doc);

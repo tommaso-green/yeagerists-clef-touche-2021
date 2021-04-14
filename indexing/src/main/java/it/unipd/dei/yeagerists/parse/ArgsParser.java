@@ -73,14 +73,14 @@ public class ArgsParser implements Iterator<ParsedArgument>, Iterable<ParsedArgu
                     parser.close();
                 }
             } catch (IOException e) {
-                log.warning(String.format("Unable to close the reader: %", e.getMessage()));
+                log.warning(String.format("Unable to close the reader: %s", e.getMessage()));
             }
         }
 
     }
 
     private ParsedArgument parse() throws IOException {
-        String id = null, body = null;
+        String id = null, body = null, stance = null;
 
         if (parser.getCurrentToken() != JsonToken.START_OBJECT)
             throw new IllegalStateException("Expecting start of object");
@@ -111,23 +111,36 @@ public class ArgsParser implements Iterator<ParsedArgument>, Iterable<ParsedArgu
                 id = parser.getText();
             }
 
-            if (nestedObjCount == 1 && currToken == JsonToken.FIELD_NAME && parser.getText().equals("text")) {
-                parser.nextToken();
-                log.fine("Found body: " + parser.getText());
-                if (body != null) {
-                    log.warning(String.format("found multiple texts for argument %s", id));
+            if (nestedObjCount == 1 && currToken == JsonToken.FIELD_NAME) {
+
+                switch (parser.getText()) {
+                    case "text":
+                        parser.nextToken();
+                        log.fine("Found body: " + parser.getText());
+                        if (body != null) {
+                            log.warning(String.format("found multiple texts for argument %s", body));
+                        }
+                        body = parser.getText();
+                        break;
+                    case "stance":
+                        parser.nextToken();
+                        log.fine("Found stance: " + parser.getText());
+                        if (stance != null) {
+                            log.warning(String.format("found multiple stances for argument %s", stance));
+                        }
+                        stance = parser.getText();
+                        break;
                 }
-                body = parser.getText();
             }
 
         }
 
-        if (id == null || body == null) {
+        if (id == null || body == null || stance == null) {
             throw new IllegalStateException("Finished parsing document but id or body are null");
         }
 
         // Move to next argument - if no argument next token will be END_ARRAY
         parser.nextToken();
-        return new ParsedArgument(id, body);
+        return new ParsedArgument(id, body, stance);
     }
 }
