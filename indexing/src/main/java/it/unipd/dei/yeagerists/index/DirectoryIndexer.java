@@ -208,7 +208,7 @@ public class DirectoryIndexer {
                     doc.add(new StringField(ParsedArgument.FIELDS.ID, arg.getId(), Field.Store.YES));
 
                     // add stance (pro/con)
-                    doc.add(new TextField(ParsedArgument.FIELDS.STANCE, arg.getStance(), Field.Store.YES));
+                    doc.add(new StanceField(arg.getStance()));
 
                     // add the document text
                     doc.add(new BodyField(arg.getBody()));

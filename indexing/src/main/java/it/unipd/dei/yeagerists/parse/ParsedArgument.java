@@ -26,7 +26,7 @@ public class ParsedArgument {
     public boolean isValid() {
         return !body.isEmpty()
                 && !id.isEmpty()
-                && !stance.isEmpty() && (stance.equals("PRO") || stance.equals("CON"));
+                && !stance.isEmpty() && (stance.equalsIgnoreCase("pro") || stance.equalsIgnoreCase("con"));
     }
 
 }

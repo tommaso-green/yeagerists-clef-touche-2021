@@ -18,9 +18,9 @@ public class BodyField extends Field {
     }
 
     /**
-     * Create a new field for the body of a document.
+     * Create a new field for the body of an argument.
      *
-     * @param value the contents of the body of a document.
+     * @param value the contents of the body of an argument.
      */
     public BodyField(final String value) {
         super(ParsedArgument.FIELDS.BODY, value, TYPE);
