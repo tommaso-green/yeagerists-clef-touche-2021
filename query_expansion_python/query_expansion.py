@@ -1,17 +1,18 @@
 import itertools
-import os
-import urllib
+import sys
+from string import punctuation
+from urllib.error import HTTPError
+
+from scipy.spatial.distance import cosine
+
 import nltk
 import torch
-import sys
 import xmltodict
-
-from urllib.error import HTTPError
-from transformers import GPT2Tokenizer, GPT2LMHeadModel, pipeline, BeamSearchScorer, AutoModelForMaskedLM, AutoTokenizer
-from textblob import TextBlob
-from string import punctuation
-from pprint import pprint
 from nltk.corpus import wordnet as wn
+from textblob import TextBlob
+from transformers import GPT2Tokenizer, GPT2LMHeadModel, pipeline, BeamSearchScorer, AutoModelForMaskedLM, AutoTokenizer, BertTokenizer, BertModel
+
+from query_exp_utils import *
 
 
 def get_topic_list(filename):
@@ -51,16 +52,59 @@ def _convert_nltk_to_wordnet_tag(pos_tag):
         return wn.NOUN
     # elif pos_tag.startswith("V"):
     #     return wn.VERB
-    elif pos_tag.startswith("R"):
-        return wn.ADV
-    elif pos_tag.startswith("J"):
-        return wn.ADJ
+    # elif pos_tag.startswith("R"):
+    #     return wn.ADV
+    # elif pos_tag.startswith("J"):
+    #     return wn.ADJ
     else:
         return None
 
 
 def intersection(list1, list2):
     return list(set(list1) & set(list2))
+
+
+def get_bert_sentence_embedding(tokenizer, model, sentence):
+
+    marked_sentence = "[CLS] " + sentence + " [SEP]"
+    tokenized_sentence = tokenizer.tokenize(marked_sentence)                    # Tokenize our sentence with the BERT tokenizer
+    segments_ids = [1] * len(tokenized_sentence)                                # Map the token strings to their vocabulary indexes.
+    indexed_sentence = tokenizer.convert_tokens_to_ids(tokenized_sentence)      # Mark each query token as belonging to sentence "1"
+    sentence_tensor = torch.tensor([indexed_sentence])                          # Convert inputs to PyTorch tensors
+    segments_tensor = torch.tensor([segments_ids])
+
+    with torch.no_grad():
+        bert_outputs = model(sentence_tensor, segments_tensor)                  # Run the text through BERT
+        hidden_states = bert_outputs[2]                                         # Collect all of the hidden states produced from all 12 layers
+
+        # To get a single vector for the entire query (basically a query embedding) we can average the second
+        # to last hidden layer of each token producing a single 768 length vector.
+        token_vectors = hidden_states[-2][0]
+        sentence_embedding = torch.mean(token_vectors, dim=0)
+
+    return sentence_embedding
+
+
+def get_bert_token_embedding(indexed_sentence, token_index):
+    model = BertModel.from_pretrained("../bert-base-uncased", output_hidden_states=True)
+
+    segments_ids = [1] * len(indexed_sentence)
+    sentence_tensor = torch.tensor([indexed_sentence])
+    segments_tensor = torch.tensor([segments_ids])
+
+    with torch.no_grad():
+        bert_outputs = model(sentence_tensor, segments_tensor)
+        hidden_states = bert_outputs[2]
+        token_layers_embeddings = torch.stack(hidden_states, dim=0)
+        token_layers_embeddings = torch.squeeze(token_layers_embeddings, dim=1)
+        token_layers_embeddings = token_layers_embeddings.permute(1, 0, 2)
+
+    token = token_layers_embeddings[token_index]
+    token_embedding = torch.cat((token[-1], token[-2], token[-3], token[-4]), dim=0)
+
+    print("Shape is: ", token_embedding.size())
+
+    return token_embedding
 
 
 def main():
@@ -135,16 +179,16 @@ def main():
                 a = TextBlob(query)
                 b = a.translate(from_lang="en", to="ar")
                 c = _clean_word(b.raw)
+
+                for lang in ["ar", "de", "es", "it", "eo", "et", "fr", "la", "no", "sv", "ru", "ja"]:
+                    spinned_query = _spin_text(c, lang)
+                    print(spinned_query)
             except HTTPError as http_exception:
                 print("An HTTP error occurred: ", http_exception.reason)
                 print("Full HTTP error header:\n", http_exception.headers)
             except:
                 print("Another error occurred!")
 
-            # for lang in ["ar", "de", "es", "it", "eo", "et", "fr", "la", "no", "sv", "ru", "ja"]:
-            #
-            #     spinned_query = _spin_text(query, lang)
-            #     print(spinned_query)
             print()
 
     # Substituting Synonyms with Part-Of-Speech (POS) filtering:
@@ -198,13 +242,71 @@ def main():
                 print(new_query)
             print()
 
-    # Back-translation using Transformers
+    # Back-translation using HuggingFace's Transformers models
+    # N.B. Can be used in final implementation but requires to download t5-base repo in the
+    # root folder of the project (es. in our case inside /seupd2021-yeager)
+    # N.B. Useless with "mt5-small" since it can't translate to more than 3 languages + can't perform back-translation
     elif task == 4:
 
+        # model = AutoModelForSeq2SeqLM.from_pretrained("../mt5-small", from_tf=True)
+        # tokenizer = AutoTokenizer.from_pretrained("../mt5-small", from_tf=True)
+
+        # Take all the languages available in mbart-large-cc25:
+        # languages = ["ar_AR", "cs_CZ", "de_DE", "en_XX", "es_XX", "et_EE", "fi_FI", "fr_XX", "gu_IN", "hi_IN", "it_IT", "ja_XX", "kk_KZ", "ko_KR",
+        #              "lt_LT", "lv_LV", "my_MM", "ne_NP", "nl_XX", "ro_RO", "ru_RU", "si_LK", "tr_TR", "vi_VN", "zh_CN"]
+        # tokenizer = MBartTokenizer.from_pretrained("../mbart-large-cc25", src_lang="en_XX")
+        # model = AutoModelForSeq2SeqLM.from_pretrained("../mbart-large-cc25")
+
         for query in topic_list[:num_query_submitted]:
-            translator = pipeline("translation_en_to_de")
-            de_queries = list(de_query["translation_text"] for de_query in translator(query, max_length=40))
-            print(de_queries)
+            from transformers import MBartTokenizer, BartForConditionalGeneration
+
+            tokenizer = MBartTokenizer.from_pretrained('../mbart-large-cc25')
+            model = BartForConditionalGeneration.from_pretrained('../mbart-large-cc25')
+
+            src_sent = "UN Chief Says There Is No Military Solution in Syria"
+
+            src_ids = tokenizer.prepare_translation_batch([src_sent])
+
+            output_ids = model.generate(src_ids["input_ids"], decoder_start_token_id=tokenizer.lang_code_to_id["ro_RO"])
+
+            output = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0]
+
+            print('src_sent: ', src_sent)
+            print('src_ids: ', src_ids)
+            print('output_ids: ', output_ids)
+            print('output: ', output)
+            # inputs = tokenizer(query, return_tensors="pt")
+            # # translated_tokens = model.generate(**inputs, decoder_start_token_id=tokenizer.lang_code_to_id["ro_RO"])
+            # translated_tokens = model.generate(**inputs, forced_bos_token_id=tokenizer.bos_token["ro_RO"])
+            # print(tokenizer.batch_decode(translated_tokens, skip_special_tokens=True)[0])
+
+        # translate_prompts = ["Translate English to German: ",
+        #                      "Translate English to French: ",
+        #                      "Translate English to Romanian: "]
+        # inverse_translate_prompts = ["Translate German to English: ",
+        #                              "Translate French to English: ",
+        #                              "Translate Romanian to English: "]
+        #
+        # for query in topic_list[:num_query_submitted]:
+        #     print("Query to translate: ", query)
+        #
+        #     for i in range(len(translate_prompts)):                        # Translate each query in multiple languages
+        #
+        #         # Move from English to the other language
+        #         prompted_query = translate_prompts[i] + query
+        #         encoded_query = tokenizer.encode(prompted_query, return_tensors="pt")
+        #         translation_outputs = model.generate(encoded_query, max_length=40, num_beams=4, early_stopping=True)
+        #         translated_query = tokenizer.decode(translation_outputs[0])
+        #         # Immediately get back to English
+        #         inverted_prompted_query = inverse_translate_prompts[i] + translated_query
+        #         inverted_encoded_query = tokenizer.encode(inverted_prompted_query, return_tensors="pt")
+        #         back_translation_outputs = model.generate(inverted_encoded_query, max_length=40, num_beams=4, early_stopping=True)
+        #         new_query = tokenizer.decode(back_translation_outputs[0])
+        #
+        #         polished_translated_query = translated_query.strip("<pad>").strip("</s>")
+        #         polished_new_query = new_query.strip("<pad>").strip("</s>")
+        #         print("Translated query: ", polished_translated_query)
+        #         print("New query: ", polished_new_query)
 
     # Substituting Synonyms using BERT with masked query (just for nouns?) and checking if the proposed word,
     # which should respect the context due to BERT capabilities, is included in the list of synonyms from WordNet.
@@ -313,13 +415,142 @@ def main():
             print()
 
     # Idea taken from "BERT-based Lexical Substitution" paper: use BERT with masked queries to propose words replacing
-    # the original ones, the evaluate the candidate’s fitness by comparing (using cosine similarity between word
+    # the original ones, then evaluate the candidate’s fitness by comparing (using cosine similarity between word
     # embeddings inside the respective query, original and modified) the sentence’s contextualized representation
     # before and after the substitution. Based on this, compute a "changed fitness" score and decide whether
     # to keep the proposed word or not.
     elif task == 6:
-        print("TO DO")
 
+        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        # tokenizer = AutoTokenizer.from_pretrained("../distilbert-base-cased")
+        model = BertModel.from_pretrained("../bert-base-uncased", output_hidden_states=True)
+        # model = AutoModelForMaskedLM.from_pretrained("../distilbert-base-cased")
+
+
+    # Get the 10 best tokens which substitutes the masked tokens of the queries (only the nouns according to WordNet),
+    # compose the new queries computing all the possible combinations and compare their embeddings to the original query embedding
+    # to understand if the query meaning changed a lot or not.
+    # Keep only the queries which lead to good cosine similarity with the original one.
+    elif task == 7:
+
+        # Use first a BERT model to get a list of proposed words in place of masked ones
+        tokenizer = AutoTokenizer.from_pretrained("../bert-base-uncased")
+        model = AutoModelForMaskedLM.from_pretrained("../bert-base-uncased")
+
+        all_new_queries_list = list()
+        for query in topic_list[:num_query_submitted]:
+
+            print("Original query: ", query)
+            tokenized_query = tokenizer.tokenize(query)
+            print("tokenized_query: ", tokenized_query)
+            pos_tags_wn = nltk.pos_tag(tokenized_query)
+            print("pos_tags for WordNet: ", pos_tags_wn)
+
+            # Use WordNet to find synonyms for each noun in the query
+            masked_words_synonyms_list = list()
+            masked_words_indexes = list()
+            for i in range(len(pos_tags_wn)):
+                pos_tag_wn = pos_tags_wn[i]
+                # We want to replace only nouns with synonyms (all other POS return None)
+                converted_pos_tag = _convert_nltk_to_wordnet_tag(pos_tag_wn[1])
+                if converted_pos_tag is not None:
+                    masked_words_indexes.append(i)
+
+            print("masked_words_indexes: ", masked_words_indexes)
+
+            # Generate all the queries with [MASK] special token in place of the nouns
+            masked_query_strings_list = list()
+            for word_index_to_mask in masked_words_indexes:
+                tokenized_query_to_mask = list(tokenized_query)  # Just take a copy not to touch
+                tokenized_query_to_mask[word_index_to_mask] = tokenizer.mask_token
+                # print("tokenized_masked_query: ", tokenized_query_to_mask)
+
+                masked_query_string = " ".join(tokenized_query_to_mask)
+                print("masked_query_string: ", masked_query_string)
+                masked_query_strings_list.append(masked_query_string)
+
+            print()
+
+            # For each masked_query_string generate the top 10 words that fit inside the [MASK] position
+            best_tokens_list = list()
+            for i in range(len(masked_query_strings_list)):
+                masked_query_string = masked_query_strings_list[i]
+
+                encoded_input = tokenizer.encode(masked_query_string, return_tensors="pt")
+                mask_token_index = torch.where(encoded_input == tokenizer.mask_token_id)[1]
+                # mask_token_index will be one unit higher than expected because of Bert [CLS] special token
+                # at the beginning of the embedding
+                # print("mask_token_index: ", mask_token_index)
+
+                token_logits = model(encoded_input).logits
+                # print("token_logits: ", token_logits)
+                mask_token_logits = token_logits[0, mask_token_index, :]
+                # print("mask_token_logits: ", mask_token_logits)
+
+                top_10_encoded_tokens = torch.topk(mask_token_logits, 10, dim=1).indices[0].tolist()
+                top_10_tokens = list((tokenizer.decode(encoded_token)) for encoded_token in top_10_encoded_tokens)
+                print("Top 10 tokens according to BERT: ", top_10_tokens)
+
+                # Add the original word of the query if not already inside best_tokens
+                masked_word_index = masked_words_indexes[i]
+                if pos_tags_wn[masked_word_index][0] not in top_10_tokens:
+                    top_10_tokens.append(pos_tags_wn[masked_word_index][0])
+                best_tokens_list.append(top_10_tokens)
+                print("-> Resulting 10 best_tokens: ", top_10_tokens)
+
+            print()
+
+            # Build query_synonyms_list with the list of feasible tokens for each position inside the query
+            query_synonyms_list = list([None] * len(pos_tags_wn))
+            for i in range(len(pos_tags_wn)):
+                if i not in masked_words_indexes:  # Add a list with just the original word
+                    query_synonyms_list[i] = list()
+                    query_synonyms_list[i].append(pos_tags_wn[i][0])
+            for j in range(len(masked_words_indexes)):  # Add the list of best tokens we just found
+                query_synonyms_list[masked_words_indexes[j]] = best_tokens_list[j]
+
+            # Compose all new queries obtained combining the best tokens
+            new_queries_list = list(itertools.product(*query_synonyms_list))
+            new_queries_strings = list(" ".join(new_query) for new_query in new_queries_list)
+            print("new_queries_strings: ", new_queries_strings)
+
+            # Add to the list of new queries for all original queries
+            all_new_queries_list.append(new_queries_strings)
+
+            print()
+
+            # Use another BERT model and tokenizer to get the query embeddings
+            tokenizer_2 = BertTokenizer.from_pretrained('../bert-base-uncased')
+            model_2 = BertModel.from_pretrained("../bert-base-uncased", output_hidden_states=True)
+
+            # Compute the embeddings for each new query and compute the cosine similarity to the original one,
+            # which is the first query in new_queries_strings, so the first cos_sim should be 1.00
+            original_query_embedding = get_bert_sentence_embedding(tokenizer_2, model_2,new_queries_strings[0])
+
+            cos_sim_list = list()
+            for new_query in new_queries_strings:
+                new_query_embedding = get_bert_sentence_embedding(tokenizer_2, model_2, new_query)
+                # print(new_query_embedding.size())
+                # new_queries_embeddings.append(new_query_embedding)
+                cos_sim = 1 - cosine(original_query_embedding, new_query_embedding)
+                cos_sim_list.append(cos_sim)
+                print(f"{new_query} -> cos similarity score: {cos_sim}")
+
+            query_sim_dict = dict(zip(new_queries_strings, cos_sim_list))
+            print(query_sim_dict)
+
+            # Keep only the "best queries", which are the ones with higher scores (80+ %)
+            max_cos_sim = 1.0
+            min_cos_sim = min(cos_sim_list)
+            sim_thresh = min_cos_sim + 0.8 * (max_cos_sim - min_cos_sim)
+            print("sim_thresh: ", sim_thresh)
+            best_query_sim_dict = {k: v for k, v in query_sim_dict.items() if v >= sim_thresh}
+            print(best_query_sim_dict)
+
+    # Demo task to test query_exp_utils
+    elif task == 8:
+        print(generate_similar_queries(topic_list[0]))
+        print("\nDemo ended successfully!")
 
 
 if __name__ == "__main__":
