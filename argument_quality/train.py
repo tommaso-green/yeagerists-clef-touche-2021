@@ -48,11 +48,16 @@ def main():
             filename=args.model_name+'_best-{epoch:02d}-{val_r2:.2f}',
             mode='max', save_top_k=1),
             EarlyStopping(monitor='val_r2', mode='max', patience=3)]
+        ckpt_flag = True #checkpoint_callback=False
+    else:
+        my_callbacks = []
+        ckpt_flag = False
 
     wandb.config.update(args)
     wandb_logger = WandbLogger()
     trainer = pl.Trainer(gpus=args.gpus, max_epochs=args.num_epochs, val_check_interval=0.25,
-                         deterministic=True, logger=wandb_logger, callbacks=my_callbacks)
+                         deterministic=True, logger=wandb_logger, callbacks=my_callbacks, 
+                         checkpoint_callback=ckpt_flag)
     trainer.fit(arg_quality_model, datamodule=dm)
     return wandb.run.url
 
