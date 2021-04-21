@@ -13,6 +13,7 @@ public class BodyField extends Field {
     static {
         TYPE.setIndexOptions(IndexOptions.DOCS_AND_FREQS);
         TYPE.setTokenized(true);
+        TYPE.setOmitNorms(false);
         TYPE.setStored(true);
         TYPE.freeze();
     }
