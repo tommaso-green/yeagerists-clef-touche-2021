@@ -38,12 +38,10 @@ public class Application {
             return;
         }
 
-        final String docsPath = cli.getOptionValue("dataset");
-        final String indexPath = cli.getOptionValue("output");
-
-        final int ramBuffer = 256;
-        final String extension = "json";
-        final String charsetName = "ISO-8859-1";
+        if (cli.hasOption("index") == cli.hasOption("search")) {
+            log.severe("Choose either index or search!");
+            return;
+        }
 
         final Analyzer analyzer = CustomAnalyzer.builder()
                 .withTokenizer(StandardTokenizerFactory.class)
@@ -55,18 +53,26 @@ public class Application {
 
         final Similarity similarity = new BM25Similarity();
 
-        final DirectoryIndexer indexer = new DirectoryIndexer(analyzer, similarity, ramBuffer, indexPath, docsPath,
-                extension, charsetName);
-        indexer.index();
+        if (cli.hasOption("index")) {
+            final String docsPath = cli.getOptionValue("dataset");
+            final String indexPath = cli.getOptionValue("output");
 
-        if (cli.hasOption("topics") && cli.hasOption("run")) {
-            final String topics = cli.getOptionValue("topics");
-            final String runPath = cli.getOptionValue("run");
+            final int ramBuffer = 256;
+            final String extension = "json";
+            final String charsetName = "ISO-8859-1";
 
-            final String runID = "yeagerists";
-            final int maxDocsRetrieved = 1000;
+            final DirectoryIndexer indexer = new DirectoryIndexer(analyzer, similarity, ramBuffer, indexPath, docsPath,
+                    extension, charsetName);
+            indexer.index();
+        }
 
-            final Searcher s = new Searcher(analyzer, similarity, indexPath, topics, runID, runPath, maxDocsRetrieved);
+        if (cli.hasOption("search")) {
+            final String indexPath = cli.getOptionValue("path");
+            final String queriesPath = cli.getOptionValue("queries");
+            final String resultsPath = cli.getOptionValue("results");
+            final int maxDocsRetrieved = Integer.parseInt(cli.getOptionValue("max", "100"));
+
+            final Searcher s = new Searcher(analyzer, similarity, indexPath, queriesPath, resultsPath, maxDocsRetrieved);
 
             try {
                 s.search();
@@ -78,10 +84,18 @@ public class Application {
 
     private static CommandLine parseArgs(String[] args) throws org.apache.commons.cli.ParseException {
         Options options = new Options();
-        options.addRequiredOption("d", "dataset", true, "Path to Args.me dataset");
-        options.addRequiredOption("o", "output", true, "Path to directory where the index will be stored");
-        options.addOption("t", "topics", true, "Path to the topics file");
-        options.addOption("r", "run", true, "Path where the run file will be stored");
+
+        // Indexing options
+        options.addOption("i", "index", false, "Index the given dataset");
+        options.addOption("d", "dataset", true, "Path to Args.me dataset when indexing");
+        options.addOption("o", "output", true, "Path to directory where the index will be stored when indexing");
+
+        // Searching options
+        options.addOption("s", "search", false, "Run a query in the given index");
+        options.addOption("p", "path", true, "Path to the index");
+        options.addOption("q", "queries", true, "Path to the queries to run (XML format)");
+        options.addOption("r", "results", true, "Path to the file where results will be written");
+        options.addOption("m", "max", true, "Maximum number of documents to retrieve");
 
         CommandLineParser parser = new DefaultParser();
         return parser.parse(options, args);

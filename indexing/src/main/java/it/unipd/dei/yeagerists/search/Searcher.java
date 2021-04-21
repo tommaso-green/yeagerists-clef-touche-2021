@@ -1,5 +1,6 @@
 package it.unipd.dei.yeagerists.search;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import it.unipd.dei.yeagerists.parse.ParsedArgument;
 import lombok.NonNull;
 import lombok.extern.java.Log;
@@ -45,8 +46,6 @@ public class Searcher {
         public static final String NARRATIVE = "narrative";
     }
 
-    private final String runID;
-    private final PrintWriter run;
     private final IndexReader reader;
     private final IndexSearcher searcher;
 
@@ -59,6 +58,7 @@ public class Searcher {
     private final int maxDocsRetrieved;
     private long elapsedTime = Long.MIN_VALUE;
 
+    private final PrintWriter out;
 
     /**
      * Creates a new searcher.
@@ -67,8 +67,7 @@ public class Searcher {
      * @param similarity       the {@code Similarity} to be used.
      * @param indexPath        the directory where containing the index to be searched.
      * @param topicsFile       the file containing the topics to search for.
-     * @param runID            the identifier of the run to be created.
-     * @param runPath          the path where to store the run.
+     * @param outputFile       the file where the results will be written
      * @param maxDocsRetrieved the maximum number of documents to be retrieved.
      * @throws NullPointerException     if any of the parameters is {@code null}.
      * @throws IllegalArgumentException if any of the parameters assumes invalid values.
@@ -78,8 +77,7 @@ public class Searcher {
             @NonNull final Similarity similarity,
             @NonNull final String indexPath,
             @NonNull final String topicsFile,
-            @NonNull final String runID,
-            @NonNull final String runPath,
+            @NonNull final String outputFile,
             @NonNull final int maxDocsRetrieved) {
 
         if (indexPath.isEmpty()) {
@@ -90,12 +88,8 @@ public class Searcher {
             throw new IllegalArgumentException("Topics file cannot be empty.");
         }
 
-        if (runID.isEmpty()) {
-            throw new IllegalArgumentException("Run identifier cannot be empty.");
-        }
-
-        if (runPath.isEmpty()) {
-            throw new IllegalArgumentException("Run path cannot be empty.");
+        if (outputFile.isEmpty()) {
+            throw new IllegalArgumentException("Output file cannot be empty");
         }
 
         final Path indexDir = Paths.get(indexPath);
@@ -103,10 +97,19 @@ public class Searcher {
             throw new IllegalArgumentException(
                     String.format("Index directory %s cannot be read.", indexDir.toAbsolutePath().toString()));
         }
-
         if (!Files.isDirectory(indexDir)) {
             throw new IllegalArgumentException(String.format("%s expected to be a directory where to search the index.",
                     indexDir.toAbsolutePath().toString()));
+        }
+
+        Path outPath = Paths.get(outputFile);
+        try {
+            out = new PrintWriter(Files.newBufferedWriter(outPath, StandardCharsets.UTF_8, StandardOpenOption.CREATE,
+                    StandardOpenOption.TRUNCATE_EXISTING,
+                    StandardOpenOption.WRITE));
+        } catch (IOException e) {
+            throw new IllegalArgumentException(
+                    String.format("Unable to open run file %s: %s.", outPath.toAbsolutePath(), e.getMessage()), e);
         }
 
         try {
@@ -128,29 +131,6 @@ public class Searcher {
 
         qp = new QueryParser(ParsedArgument.FIELDS.BODY, analyzer);
 
-        this.runID = runID;
-
-        final Path runDir = Paths.get(runPath);
-        if (!Files.isWritable(runDir)) {
-            throw new IllegalArgumentException(
-                    String.format("Run directory %s cannot be written.", runDir.toAbsolutePath().toString()));
-        }
-
-        if (!Files.isDirectory(runDir)) {
-            throw new IllegalArgumentException(String.format("%s expected to be a directory where to write the run.",
-                    runDir.toAbsolutePath().toString()));
-        }
-
-        Path runFile = runDir.resolve(runID + ".txt");
-        try {
-            run = new PrintWriter(Files.newBufferedWriter(runFile, StandardCharsets.UTF_8, StandardOpenOption.CREATE,
-                    StandardOpenOption.TRUNCATE_EXISTING,
-                    StandardOpenOption.WRITE));
-        } catch (IOException e) {
-            throw new IllegalArgumentException(
-                    String.format("Unable to open run file %s: %s.", runFile.toAbsolutePath(), e.getMessage()), e);
-        }
-
         if (maxDocsRetrieved <= 0) {
             throw new IllegalArgumentException(
                     "The maximum number of documents to be retrieved cannot be less than or equal to zero.");
@@ -171,24 +151,17 @@ public class Searcher {
      */
     public void search() throws IOException, ParseException {
 
-        log.info("%n#### Start searching ####%n");
-        log.info("Number of topics: " + topics.size());
-        // the start time of the searching
         final long start = System.currentTimeMillis();
 
-        final Set<String> idField = new HashSet<>();
-        idField.add(ParsedArgument.FIELDS.ID);
-
+        List<ResultDocument> resultDocuments = new ArrayList<>();
         BooleanQuery.Builder bq = null;
         Query q = null;
         TopDocs docs = null;
-        ScoreDoc[] sd = null;
-        String docID = null;
 
         try {
             for (QualityQuery t : topics) {
 
-                log.info(String.format("Searching for topic %s.", t.getQueryID()));
+                log.info(String.format("Searching: %s.", t.getQueryID()));
 
                 bq = new BooleanQuery.Builder();
 
@@ -200,29 +173,61 @@ public class Searcher {
                 log.info("Searching for query: " + q.toString());
 
                 docs = searcher.search(q, maxDocsRetrieved);
-
-                sd = docs.scoreDocs;
-
-                for (int i = 0, n = sd.length; i < n; i++) {
-                    docID = reader.document(sd[i].doc, idField).get(ParsedArgument.FIELDS.ID);
-
-                    run.printf(Locale.ENGLISH, "%s\tQ0\t%s\t%d\t%.6f\t%s%n", t.getQueryID(), docID, i, sd[i].score,
-                            runID);
-                }
-
-                run.flush();
+                List<ResultDocument> queryResults = readResultsDocument(t.getQueryID(), docs);
+                resultDocuments.addAll(queryResults);
 
             }
-        } finally {
-            run.close();
 
+            writeResultsToFile(resultDocuments, out);
+
+        } finally {
             reader.close();
+            out.close();
         }
+
+
 
         elapsedTime = System.currentTimeMillis() - start;
 
-        log.info(String.format("%d topic(s) searched in %d seconds.", topics.size(), elapsedTime / 1000));
-        log.info("#### Searching complete ####%n");
+        log.info(String.format("%d queries in %d ms.", topics.size(), elapsedTime));
+    }
+
+    /**
+     * Read documents from index
+     * @param queryId query identifier
+     * @param docs Score documents used to retrieve original documents
+     * @return  Result documents loaded from index
+     * @throws IOException if an error occurs when reading the index
+     */
+    private List<ResultDocument> readResultsDocument(String queryId, TopDocs docs) throws IOException {
+        List<ResultDocument> resultDocuments = new ArrayList<>();
+        final Set<String> fields = new HashSet<>();
+        fields.add(ParsedArgument.FIELDS.ID);
+        fields.add(ParsedArgument.FIELDS.BODY);
+        fields.add(ParsedArgument.FIELDS.STANCE);
+
+        ScoreDoc[] scoreDocs = docs.scoreDocs;
+
+        for (ScoreDoc sc : scoreDocs) {
+            org.apache.lucene.document.Document indexedDoc = reader.document(sc.doc, fields);
+            ResultDocument toAdd = ResultDocument.builder()
+                    .score(sc.score)
+                    .queryId(queryId)
+                    .id(indexedDoc.get(ParsedArgument.FIELDS.ID))
+                    .body(indexedDoc.get(ParsedArgument.FIELDS.BODY))
+                    .stance(indexedDoc.get(ParsedArgument.FIELDS.STANCE))
+                    .build();
+
+            resultDocuments.add(toAdd);
+        }
+
+        return resultDocuments;
+    }
+
+    private void writeResultsToFile(List<ResultDocument> resultDocuments, PrintWriter writer) throws IOException {
+        final ObjectMapper mapper = new ObjectMapper();
+
+        mapper.writeValue(writer, resultDocuments);
     }
 
     /**
