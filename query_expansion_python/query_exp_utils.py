@@ -10,6 +10,12 @@ from scipy.spatial.distance import cosine
 def _convert_nltk_to_wordnet_tag(pos_tag):
     if pos_tag.startswith("N"):
         return wn.NOUN
+    elif pos_tag.startswith("V"):
+        return wn.VERB
+    # elif pos_tag.startswith("R"):
+    #     return wn.ADV
+    # elif pos_tag.startswith("J"):
+    #     return wn.ADJ
     else:
         return None
 
@@ -35,7 +41,7 @@ def _get_bert_sentence_embedding(tokenizer, model, sentence):
     return sentence_embedding
 
 
-def generate_similar_queries(input_query, verbosity=False):
+def generate_similar_queries(input_query, verbose=False):
 
     # Use first a BERT model to get a list of proposed words in place of masked ones
     mask_tokenizer = AutoTokenizer.from_pretrained("../bert-base-uncased")
@@ -43,6 +49,8 @@ def generate_similar_queries(input_query, verbosity=False):
 
     tokenized_query = mask_tokenizer.tokenize(input_query)
     pos_tags_wn = nltk.pos_tag(tokenized_query)
+    if verbose:
+        print("Recognized POS tags: ", pos_tags_wn)
 
     # Use WordNet to find synonyms for each noun in the query
     masked_words_indexes = list()
@@ -61,6 +69,8 @@ def generate_similar_queries(input_query, verbosity=False):
         # print("tokenized_masked_query: ", tokenized_query_to_mask)
 
         masked_query_string = " ".join(tokenized_query_to_mask)
+        if verbose:
+            print("Masked query: ", masked_query_string)
         masked_query_strings_list.append(masked_query_string)
 
     # For each masked_query_string generate the top 10 words that fit inside the [MASK] position
@@ -81,7 +91,13 @@ def generate_similar_queries(input_query, verbosity=False):
         masked_word_index = masked_words_indexes[i]
         if pos_tags_wn[masked_word_index][0] not in top_10_tokens:
             top_10_tokens.append(pos_tags_wn[masked_word_index][0])
-        best_tokens_list.append(top_10_tokens)
+
+        # Remove all the partial tokens retrieved by BERT (with format "##abcdefgh")
+        top_10_tokens_filtered = [token for token in top_10_tokens if not token.startswith("##")]
+        if verbose:
+            print("Top 10 tokens: ", top_10_tokens_filtered)
+        best_tokens_list.append(top_10_tokens_filtered)
+
 
     # Build query_synonyms_list with the list of feasible tokens for each position inside the query
     query_synonyms_list = list([None] * len(pos_tags_wn))
@@ -110,7 +126,7 @@ def generate_similar_queries(input_query, verbosity=False):
         cos_sim = 1 - cosine(original_query_embedding, new_query_embedding)
         cos_sim_list.append(cos_sim)
 
-        if verbosity:
+        if verbose:
             print(f"{new_query} -> cos similarity score: {cos_sim}")
 
     # Collect all (new_query, cosine_similarity_score) pairs inside a dictionary

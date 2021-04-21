@@ -50,8 +50,8 @@ def _infer_pos_tags(tokens):
 def _convert_nltk_to_wordnet_tag(pos_tag):
     if pos_tag.startswith("N"):
         return wn.NOUN
-    # elif pos_tag.startswith("V"):
-    #     return wn.VERB
+    elif pos_tag.startswith("V"):
+        return wn.VERB
     # elif pos_tag.startswith("R"):
     #     return wn.ADV
     # elif pos_tag.startswith("J"):
@@ -489,7 +489,6 @@ def main():
 
                 top_10_encoded_tokens = torch.topk(mask_token_logits, 10, dim=1).indices[0].tolist()
                 top_10_tokens = list((tokenizer.decode(encoded_token)) for encoded_token in top_10_encoded_tokens)
-                print("Top 10 tokens according to BERT: ", top_10_tokens)
 
                 # Add the original word of the query if not already inside best_tokens
                 masked_word_index = masked_words_indexes[i]
@@ -547,9 +546,11 @@ def main():
             best_query_sim_dict = {k: v for k, v in query_sim_dict.items() if v >= sim_thresh}
             print(best_query_sim_dict)
 
+            print()
+
     # Demo task to test query_exp_utils
     elif task == 8:
-        print(generate_similar_queries(topic_list[0]))
+        print(generate_similar_queries(topic_list[6], verbose=True))
         print("\nDemo ended successfully!")
 
 
