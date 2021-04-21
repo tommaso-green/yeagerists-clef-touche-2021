@@ -41,12 +41,13 @@ def main():
     else:
         wandb.init(project="ArgumentQuality", name=args.model_name)
 
-    my_callbacks = [ModelCheckpoint(
-        monitor='val_r2',
-        dirpath='model_checkpoints/',
-        filename=args.model_name+'_best-{epoch:02d}-{val_r2:.2f}',
-        mode='max', save_top_k=1),
-        EarlyStopping(monitor='val_r2', mode='max', patience=3)]
+    if not args.hyperparameter_search:
+        my_callbacks = [ModelCheckpoint(
+            monitor='val_r2',
+            dirpath='model_checkpoints/',
+            filename=args.model_name+'_best-{epoch:02d}-{val_r2:.2f}',
+            mode='max', save_top_k=1),
+            EarlyStopping(monitor='val_r2', mode='max', patience=3)]
 
     wandb.config.update(args)
     wandb_logger = WandbLogger()
