@@ -22,6 +22,7 @@ class ArgQualityModel(pl.LightningModule):
         self.loss_fn = nn.MSELoss()
         self.train_r2score = R2Score()
         self.val_r2score = R2Score()
+        self.test_r2score = R2Score()
 
         for param in self.encoder.base_model.parameters():
             param.requires_grad = False
@@ -65,6 +66,19 @@ class ArgQualityModel(pl.LightningModule):
         if batch_targets.shape[0] >= 2:  # 2 samples at least needed for R2 computation
             val_r2 = self.val_r2score(batch_scores, batch_targets)
             self.log('val_r2', val_r2, on_step=False, on_epoch=True, prog_bar=True)
+
+    def test_step(self, batch, batch_idx):
+        batch_input, batch_targets = batch
+        encoder_output = self.encoder(**batch_input, output_hidden_states=True)  # BERT pass
+        cls_emb = encoder_output.last_hidden_state[:, 0, :]
+        batch_scores = self.ffn(cls_emb)
+
+        loss = self.loss_fn(batch_scores, batch_targets)
+        self.log('test_loss', loss, on_step=False, on_epoch=True, prog_bar=True)
+
+        if batch_targets.shape[0] >= 2:  # 2 samples at least needed for R2 computation
+            test_r2 = self.test_r2score(batch_scores, batch_targets)
+            self.log('test_r2', test_r2, on_step=False, on_epoch=True, prog_bar=True)
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
