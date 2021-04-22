@@ -46,8 +46,8 @@ def main():
             monitor='val_r2',
             dirpath='model_checkpoints/',
             filename=args.model_name+'_best-{epoch:02d}-{val_r2:.2f}',
-            mode='max', save_top_k=1),
-            EarlyStopping(monitor='val_r2', mode='max', patience=3)]
+            mode='max', save_top_k=2),
+            EarlyStopping(monitor='val_r2', mode='max', patience=4)]
         ckpt_flag = True #checkpoint_callback=False
     else:
         my_callbacks = []
