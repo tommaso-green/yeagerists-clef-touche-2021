@@ -1,10 +1,11 @@
 import os
 import json
+import xmltodict
 
 
 # todo do query expansion - returns arrays of queries and ids
 def expand_query(query: str):
-    return [qid for qid in range(3)], [query+" 1" for i in range(3)]
+    return [qid for qid in range(3)], [query + " 1" for i in range(3)]
 
 
 def write_queries_to_file(path: str, queries: [str], ids: [str]):
@@ -34,19 +35,32 @@ def read_results(res_path: str):
     return res
 
 
-def main():
+def read_topics(topics_path):
 
+    f = open(topics_path, "r")
+    xml_data = f.read()
+    my_dict = xmltodict.parse(xml_data)
+
+    topic_dicts = my_dict['topics']['topic']
+    t_list = [(int(x['number']), x['title']) for x in topic_dicts]
+    return sorted(t_list, key=lambda x: x[0])
+
+
+def main():
     # todo add program arguments
     index_path = "data/index"
     queries_path = "data/_tmp_queries.xml"
     results_path = "data/res.txt"
+    topics_path = "datasets/touche2021topics/topics-task-1-only-titles.xml"
     max_docs = "10"
-
+    topic_list = read_topics(topics_path)
     # TODO read queries from topics file
     ids, queries = expand_query("weed")
+    #ids = [x[0] for x in topic_list]
+    #queries = [x[1] for x in topic_list]
     write_queries_to_file(queries_path, queries, ids)
 
-    args = "--search --path {index} --queries {queries} --results {results} --max {max_docs}"\
+    args = "--search --path {index} --queries {queries} --results {results} --max {max_docs}" \
         .format(index=index_path, queries=queries_path, results=results_path, max_docs=max_docs)
     os.system("java -jar indexing/target/indexing-1.0-SNAPSHOT-jar-with-dependencies.jar " + args)
 
