@@ -36,7 +36,7 @@ class ArgQualityModel(pl.LightningModule):
         batch_scores = self.ffn(cls_emb)
 
         textual_args = self.tokenizer.batch_decode(batch_input['input_ids'], skip_special_tokens=True)
-        arg_to_score = [[x, batch_scores[idx][0]] for idx, x in enumerate(textual_args)]
+        arg_to_score = [[x, batch_scores[idx][0].item()] for idx, x in enumerate(textual_args)]
         return arg_to_score
 
     def training_step(self, batch, batch_idx):

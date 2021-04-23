@@ -1,0 +1,9 @@
+torch
+pytorch-lightning
+torchmetrics
+wandb
+knockknock
+transformers
+tokenizers
+datasets
+xmltodict
