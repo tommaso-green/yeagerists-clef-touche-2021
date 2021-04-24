@@ -168,7 +168,7 @@ def generate_similar_queries(input_query, verbose=False):
     return best_queries_list
 
 
-def generate_similar_queries_2(input_query, verbose=False):
+def impr_generate_similar_queries(input_query, verbose=False):
 
     # Use first a BERT model to get a list of proposed words in place of masked ones
     mask_tokenizer = AutoTokenizer.from_pretrained("../bert-base-uncased")
@@ -212,13 +212,13 @@ def generate_similar_queries_2(input_query, verbose=False):
 
         # Remove all the partial tokens retrieved by BERT (with format "##abcdefgh")
         top_10_tokens_filtered = [token for token in top_10_tokens if not token.startswith("##")]
-        if verbose:
-            print("Top 10 tokens: ", top_10_tokens_filtered)
         best_tokens_list.append(top_10_tokens_filtered)
 
     original_masked_words = list(tokenized_query[i] for i in masked_words_indexes)
-    print("best_tokens_list: ", best_tokens_list)
-    print("original_masked_words: ", original_masked_words)
+    if verbose:
+        print("best_tokens_list: ", best_tokens_list)
+        print("original_masked_words: ", original_masked_words)
+        print()
 
     # Use another BERT model and tokenizer to get the query embeddings
     emb_tokenizer = BertTokenizer.from_pretrained('../bert-base-uncased')
@@ -230,6 +230,7 @@ def generate_similar_queries_2(input_query, verbose=False):
         original_token_embedding = _get_bert_token_embedding(emb_tokenizer, emb_model, input_query, masked_words_indexes[i])
         best_tokens = best_tokens_list[i]
 
+        # Collect all (new_token_for_current_position, cosine_similarity_score) pairs inside a dictionary
         new_token_sim_dict = dict()
         for best_token in best_tokens:
             new_tokenized_query = tokenized_query.copy()
@@ -247,25 +248,23 @@ def generate_similar_queries_2(input_query, verbose=False):
             if verbose:
                 print(f"{best_token} -> cos similarity score: {cos_sim}")
 
-        # Collect all (new_token_for_current_position, cosine_similarity_score) pairs inside a dictionary
-        print("new_token_sim_dict: ", new_token_sim_dict)
-
         # Guarantee that for each token there are at most about 5 new tokens (to limit execution time while keeping results quality high)
         sim_thresh = 0.8
         best_new_token_sim_dict = {k: v for k, v in new_token_sim_dict.items() if v >= sim_thresh}
         if len(new_token_sim_dict) >= 5:                                                # Should always be true, since Bert retrieves top 10 tokens
             while len(best_new_token_sim_dict.keys()) <= 4 and sim_thresh >= 0.72:      # Set 4 as a threshold since it will likely be overcome
                 sim_thresh -= 0.02
-                print("sim_thresh: ", sim_thresh)
                 best_new_token_sim_dict = {k: v for k, v in new_token_sim_dict.items() if v >= sim_thresh}
-                print("best_new_token_sim_dict: ", best_new_token_sim_dict)
 
         best_new_tokens = [k for k in best_new_token_sim_dict.keys()]
-        print("best_new_tokens: ", best_new_tokens)
+        if verbose:
+            print("best_new_tokens: ", best_new_tokens)
+            print()
 
         best_new_tokens_list.append(best_new_tokens)
 
-    print("best_new_tokens_list: ", best_new_tokens_list)
+    if verbose:
+        print("best_new_tokens_list: ", best_new_tokens_list)
 
     # Build query_synonyms_list with the list of feasible tokens for each position inside the query
     query_synonyms_list = list([None] * len(pos_tags_wn))
@@ -279,6 +278,10 @@ def generate_similar_queries_2(input_query, verbose=False):
     # Compose all new queries obtained combining the best tokens
     new_queries_list = list(itertools.product(*query_synonyms_list))
     new_queries_strings = list(" ".join(new_query) for new_query in new_queries_list)
-    print("new_queries_strings: ", new_queries_strings)
+
+    if verbose:
+        print("\nTotal number of queries generated: ", len(new_queries_strings))
+        print("Final list of new queries: ", new_queries_strings)
+        print()
 
     return new_queries_strings
