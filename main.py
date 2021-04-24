@@ -65,6 +65,7 @@ def main():
     topic_list = read_topics(args.topicpath)
 
     arg_quality_model = ArgQualityModel.load_from_checkpoint("argument_quality/model_checkpoints/" + args.ckpt)
+    arg_quality_model.eval()
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f"Device {device}")
     arg_quality_model.to(device)
@@ -72,9 +73,16 @@ def main():
     ids = [x[0] for x in topic_list]
     queries = [x[1] for x in topic_list]
 
+    start = datetime.now()
+    tot_queries = []
     for q in queries:
+        print(f"Expanding query {q}")
         ids, new_queries = expand_query(q)
+        tot_queries.append(new_queries)
         write_queries_to_file(args.querypath, new_queries, ids)
+    end = datetime.now()
+    time_taken = end - start
+    print('Time taken for Query Expansion: ', time_taken)
 
     java_args = f"--search --path {args.indexpath} --queries {args.querypath} --results {args.resultpath} --max {args.maxdocs}"
     os.system("java -jar indexing/target/indexing-1.0-SNAPSHOT-jar-with-dependencies.jar " + java_args)
@@ -90,7 +98,11 @@ def main():
         print("Doc score: %s" % d["score"])
 
     arguments = [d["body"] for d in documents]
+    start = datetime.now()
     arg_to_score = arg_quality_model(arguments)
+    end = datetime.now()
+    time_taken = end - start
+    print('Time for Query Expansion: ', time_taken)
 
     print("\n"+"*" * 5 + "RERANKED LIST" + "*" * 5)
     for i, d in enumerate(documents):
@@ -119,9 +131,9 @@ def main():
 
 
 if __name__ == "__main__":
-    start = datetime.now()
+    start_m = datetime.now()
     main()
-    end = datetime.now()
-    time_taken = end - start
+    end_m = datetime.now()
+    time_taken = end_m - start_m
     print('Time: ', time_taken)
 
