@@ -14,8 +14,8 @@ def _convert_nltk_to_wordnet_tag(pos_tag):
     #     return wn.VERB
     # elif pos_tag.startswith("R"):
     #     return wn.ADV
-    # elif pos_tag.startswith("J"):
-    #     return wn.ADJ
+    elif pos_tag.startswith("J"):
+        return wn.ADJ
     else:
         return None
 
@@ -171,12 +171,33 @@ def generate_similar_queries(input_query: str, verbose=False):
 def impr_generate_similar_queries(input_query: str, verbose=False):
 
     # Use first a BERT model to get a list of proposed words in place of masked ones
-    mask_tokenizer = AutoTokenizer.from_pretrained("../bert-base-uncased")
+    # mask_tokenizer = AutoTokenizer.from_pretrained("../bert-base-uncased")
+    mask_tokenizer = AutoTokenizer.from_pretrained('../bert-base-uncased')
     mask_model = AutoModelForMaskedLM.from_pretrained("../bert-base-uncased")
+    mask_model.eval()
+
+    tokenized_query = mask_tokenizer.tokenize(input_query)
+    if verbose:
+        print("tokenized_query: ", tokenized_query)
+
+    # Refine the tokenized query to concatenate partial tokens "##abcdefgh" with their own full tokens
+    i = 0
+    while i < len(tokenized_query):
+        if tokenized_query[i].startswith("##"):
+            tokenized_query[i] = tokenized_query[i].replace('##', '')
+            tokenized_query[i - 1] = tokenized_query[i - 1] + tokenized_query[i]
+            tokenized_query.pop(i)
+        else:
+            i += 1
+
+    if verbose:
+        print("Refined tokenized_query: ", tokenized_query)
 
     # Get the indexes of just some specific POS of the query (es. just nouns), so that we know which tokens to mask
-    tokenized_query = mask_tokenizer.tokenize(input_query)
     pos_tags_wn = nltk.pos_tag(tokenized_query)
+    if verbose:
+        print("pos_tags_wn: ", pos_tags_wn)
+
     masked_words_indexes = [i for i in range(len(pos_tags_wn)) if _convert_nltk_to_wordnet_tag(pos_tags_wn[i][1]) is not None]
 
     # Generate all the queries with [MASK] special token in place of the nouns
@@ -200,6 +221,7 @@ def impr_generate_similar_queries(input_query: str, verbose=False):
         mask_token_index = torch.where(encoded_input == mask_tokenizer.mask_token_id)[1]
         token_logits = mask_model(encoded_input).logits
         mask_token_logits = token_logits[0, mask_token_index, :]
+        # softmax_mask_token_logits = torch.nn.functional.softmax(mask_token_logits, dim=None, _stacklevel=3, dtype=None)
 
         # Get the best 10 predictions from BERT
         top_10_encoded_tokens = torch.topk(mask_token_logits, 10, dim=1).indices[0].tolist()
@@ -223,6 +245,7 @@ def impr_generate_similar_queries(input_query: str, verbose=False):
     # Use another BERT model and tokenizer to get the query embeddings
     emb_tokenizer = BertTokenizer.from_pretrained('../bert-base-uncased')
     emb_model = BertModel.from_pretrained("../bert-base-uncased", output_hidden_states=True)
+    emb_model.eval()
 
     # cos_sim_list = list()
     best_new_tokens_list = list()

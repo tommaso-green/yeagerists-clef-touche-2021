@@ -550,9 +550,16 @@ def main():
 
     # Demo task to test query_exp_utils
     elif task == 8:
-        all_new_queries = impr_generate_similar_queries(topic_list[1], verbose=False)
-        for query in all_new_queries:
-            print(query)
+        for i in range(50):
+            all_new_queries = impr_generate_similar_queries(topic_list[i], verbose=False)
+            print(f"Number of new queries: {len(all_new_queries)}\n")
+            for query in all_new_queries:
+                print(query)
+            print()
+
+        # all_new_queries = impr_generate_similar_queries(topic_list[5], verbose=True)
+        # for query in all_new_queries:
+        #     print(query)
         print("\nDemo ended successfully!")
 
 
