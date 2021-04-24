@@ -3,12 +3,13 @@ import json
 import torch.cuda
 import xmltodict
 from argument_quality.model import *
+from query_expansion_python.query_exp_utils import *
 from datetime import datetime
 
 
-# todo do query expansion - returns arrays of queries and ids
 def expand_query(query: str):
-    return [qid for qid in range(3)], [query + " 1" for i in range(3)]
+    new_queries_list = impr_generate_similar_queries(query, verbose=False)
+    return [query_id for query_id in range(len(new_queries_list))], new_queries_list
 
 
 def write_queries_to_file(path: str, queries: [str], ids: [str]):
@@ -70,9 +71,10 @@ def main():
 
     ids = [x[0] for x in topic_list]
     queries = [x[1] for x in topic_list]
-    # todo expand queries
-    # ids, queries = expand_query("weed")
-    write_queries_to_file(args.querypath, queries, ids)
+
+    for q in queries:
+        ids, new_queries = expand_query(q)
+        write_queries_to_file(args.querypath, new_queries, ids)
 
     java_args = f"--search --path {args.indexpath} --queries {args.querypath} --results {args.resultpath} --max {args.maxdocs}"
     os.system("java -jar indexing/target/indexing-1.0-SNAPSHOT-jar-with-dependencies.jar " + java_args)

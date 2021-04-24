@@ -75,7 +75,7 @@ def _get_sentence_words_to_mask_indexes(pos_tags):
     return words_to_mask_indexes
 
 
-def generate_similar_queries(input_query, verbose=False):
+def generate_similar_queries(input_query: str, verbose=False):
 
     # Use first a BERT model to get a list of proposed words in place of masked ones
     mask_tokenizer = AutoTokenizer.from_pretrained("../bert-base-uncased")
@@ -168,7 +168,7 @@ def generate_similar_queries(input_query, verbose=False):
     return best_queries_list
 
 
-def impr_generate_similar_queries(input_query, verbose=False):
+def impr_generate_similar_queries(input_query: str, verbose=False):
 
     # Use first a BERT model to get a list of proposed words in place of masked ones
     mask_tokenizer = AutoTokenizer.from_pretrained("../bert-base-uncased")
