@@ -9,13 +9,6 @@ Depending on the arguments, the program can index the Args.me corpus (https://ze
 - Optionally, the topics of the Touché task: https://webis.de/events/touche-21/topics-task-1-only-titles-2021.zip
 
 ## Usage
-
-Copy the `.env.example` file content and create a `.env` file with the following variables:
-- DATASET_PATH=/path/to/args.me/corpus
-- INDEX_PATH=./path/to/where/the/index/will/be/stored/or/read
-- MAX_RESULTS=maximum number of documents retrieved by the searcher
-
-
 ### Build
 Run `./mvnw clean package` to create a jar of the application. You will find the jar (with dependencies) in the `target` directory.
 
