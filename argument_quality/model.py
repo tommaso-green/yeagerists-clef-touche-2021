@@ -8,7 +8,7 @@ from torchmetrics import R2Score
 
 class ArgQualityModel(pl.LightningModule):
 
-    def __init__(self, model_name, learning_rate, weight_decay):
+    def __init__(self, model_name, learning_rate, weight_decay, dropout_prob):
         super().__init__()
 
         self.learning_rate = learning_rate
@@ -17,7 +17,7 @@ class ArgQualityModel(pl.LightningModule):
         # BERT encoder
         self.encoder = AutoModel.from_pretrained(model_name)
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.ffn = nn.Sequential(nn.Linear(768, 512), nn.ReLU(), nn.Linear(512, 256), nn.ReLU(), nn.Linear(256, 1))
+        self.ffn = nn.Sequential(nn.Linear(768, 512), nn.SELU(), nn.Linear(512, 256), nn.SELU(), nn.Dropout(dropout_prob), nn.Linear(256, 1))
 
         self.loss_fn = nn.MSELoss()
         self.train_r2score = R2Score()
