@@ -13,10 +13,8 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.core.LowerCaseFilterFactory;
 import org.apache.lucene.analysis.core.StopFilterFactory;
 import org.apache.lucene.analysis.custom.CustomAnalyzer;
-import org.apache.lucene.analysis.en.EnglishPossessiveFilterFactory;
-import org.apache.lucene.analysis.en.KStemFilterFactory;
 import org.apache.lucene.analysis.standard.StandardTokenizerFactory;
-import org.apache.lucene.search.similarities.BM25Similarity;
+import org.apache.lucene.search.similarities.LMDirichletSimilarity;
 import org.apache.lucene.search.similarities.Similarity;
 
 import java.io.IOException;
@@ -56,11 +54,9 @@ public class Application {
                 .withTokenizer(StandardTokenizerFactory.class)
                 .addTokenFilter(LowerCaseFilterFactory.class)
                 .addTokenFilter(StopFilterFactory.class)
-                .addTokenFilter(EnglishPossessiveFilterFactory.class)
-                .addTokenFilter(KStemFilterFactory.class)
                 .build();
 
-        final Similarity similarity = new BM25Similarity();
+        final Similarity similarity = new LMDirichletSimilarity();
 
         // Index the Args.me corpus: https://zenodo.org/record/3734893
         if (cli.hasOption("index")) {
