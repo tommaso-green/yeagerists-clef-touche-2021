@@ -8,7 +8,7 @@ import org.apache.lucene.benchmark.quality.QualityQuery;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.queryparser.classic.ParseException;
-import org.apache.lucene.queryparser.classic.QueryParserBase;
+import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.*;
 import org.apache.lucene.search.similarities.Similarity;
 import org.apache.lucene.store.FSDirectory;
@@ -30,7 +30,7 @@ public class Searcher {
      */
     private final List<QualityQuery> queries;
 
-    private final org.apache.lucene.queryparser.classic.QueryParser qp;
+    private final QueryParser queryParser;
     private final int maxDocsRetrieved;
 
     /**
@@ -91,7 +91,7 @@ public class Searcher {
         searcher = new IndexSearcher(reader);
         searcher.setSimilarity(similarity);
 
-        qp = new org.apache.lucene.queryparser.classic.QueryParser(ParsedArgument.FIELDS.BODY, analyzer);
+        queryParser = new QueryParser(ParsedArgument.FIELDS.BODY, analyzer);
 
         this.maxDocsRetrieved = maxDocsRetrieved;
     }
@@ -116,25 +116,24 @@ public class Searcher {
         List<ResultArgument> resultArguments = new ArrayList<>();
 
         try {
-            BooleanQuery.Builder bq = null;
-            Query q = null;
-            TopDocs docs = null;
+            for (QualityQuery qualityQuery : queries) {
 
-            for (QualityQuery t : queries) {
+                log.info(String.format("Searching: %s.", qualityQuery.getQueryID()));
 
-                log.info(String.format("Searching: %s.", t.getQueryID()));
+                // Escape any operator from the original query
+                String queryText = queryParser.escape(qualityQuery.getValue(ToucheQuery.TOPIC_FIELDS.TITLE));
 
-                bq = new BooleanQuery.Builder();
+                // Arguments should contain terms in the queryText
+                Query query = new BooleanQuery.Builder()
+                        .add(queryParser.parse(queryText), BooleanClause.Occur.SHOULD)
+                        .build();
 
-                bq.add(qp.parse(QueryParserBase.escape(t.getValue(ToucheQuery.TOPIC_FIELDS.TITLE))), BooleanClause.Occur.SHOULD);
-                //bq.add(qp.parse(QueryParserBase.escape(t.getValue(TOPIC_FIELDS.DESCRIPTION))), BooleanClause.Occur.SHOULD);
+                log.info("Searching for query: " + query.toString());
 
-                q = bq.build();
-
-                log.info("Searching for query: " + q.toString());
-
-                docs = searcher.search(q, maxDocsRetrieved);
-                List<ResultArgument> queryResults = Utils.readResultsDocument(reader, t.getQueryID(), docs);
+                TopDocs docs = searcher.search(query, maxDocsRetrieved);
+                // Get argument data from the index
+                List<ResultArgument> queryResults = Utils.readResultsDocument(reader, qualityQuery.getQueryID(), docs);
+                // Accumulate queries results in a single list
                 resultArguments.addAll(queryResults);
             }
 
