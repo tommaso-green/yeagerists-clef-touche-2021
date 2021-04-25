@@ -1,4 +1,4 @@
-include .env
+include .env.example
 export
 
 index: build index
