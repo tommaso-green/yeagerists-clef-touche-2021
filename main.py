@@ -1,3 +1,4 @@
+import argparse
 import os
 import json
 import torch.cuda
@@ -58,7 +59,7 @@ def main():
     parser.add_argument('-r', '--resultpath', type=str, default="data/res.txt")
     parser.add_argument('-t', '--topicpath', type=str,
                         default="datasets/touche2021topics/topics-task-1-only-titles.xml")
-    parser.add_argument('-c', '--ckpt', type=str, default="bert-base-uncased_best-epoch=04-val_r2=0.69.ckpt")
+    parser.add_argument('-c', '--ckpt', type=str, default="argument_quality/model_checkpoints/bert-base-uncased_best-epoch=04-val_r2=0.69.ckpt")
     parser.add_argument('-m', '--maxdocs', type=str, default="10")
     parser.add_argument('-qe', '--queryexp', action='store_true')
     parser.add_argument('-a', '--alpha', type=float, default=0.3)
@@ -68,7 +69,7 @@ def main():
     topic_list = read_topics(args.topicpath)
     print(f"Topic List size: {len(topic_list)}")
 
-    arg_quality_model = ArgQualityModel.load_from_checkpoint("argument_quality/model_checkpoints/" + args.ckpt)
+    arg_quality_model = ArgQualityModel.load_from_checkpoint(args.ckpt)
     arg_quality_model.eval()
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f"Device {device}")
