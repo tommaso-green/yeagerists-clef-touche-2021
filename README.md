@@ -4,8 +4,6 @@
 - Make
 - The Args.me corpus: https://zenodo.org/record/3734893#.YIV1SYNfi6k
 - The Argument Quality model: https://drive.google.com/u/0/uc?export=download&confirm=w1AV&id=12aSB-jCPnkJmTByV53IWIy_GHgTFP6bg
-- Optionally, the topics of the Touché task: https://webis.de/events/touche-21/topics-task-1-only-titles-2021.zip
-- TODO add other requirements
 
 ## Usage
 
