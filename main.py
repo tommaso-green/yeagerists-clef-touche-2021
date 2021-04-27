@@ -1,4 +1,3 @@
-import argparse
 import os
 import json
 import torch.cuda
@@ -6,11 +5,19 @@ import xmltodict
 from argument_quality.model import *
 from query_expansion_python.query_exp_utils import *
 from datetime import datetime
+import math
 
 
 def expand_query(query: str):
     new_queries_list = impr_generate_similar_queries(query, verbose=False)
     return [query_id for query_id in range(len(new_queries_list))], new_queries_list
+
+
+def score(alpha, rel_score, q_score, type):
+    if type == 'sigmoid':
+        c = 0.2
+        sigmoid = lambda x: 1 / (1 + math.exp(-c * x))
+        return (1 - alpha) * sigmoid(rel_score) + alpha * sigmoid(q_score)
 
 
 def write_queries_to_file(path: str, queries: [str], ids: [str]):
@@ -118,7 +125,7 @@ def main():
 
         print("\n" + "*" * 5 + "RERANKED LIST" + "*" * 5)
         for i, d in enumerate(documents):
-            d["total_score"] = (1 - args.alpha) * d["score"] + args.alpha * args_with_score[i][1]
+            d["total_score"] = score(args.alpha, d["score"], args_with_score[i][1], type='sigmoid')
         reranked_docs = sorted(documents, key=lambda d: (int(d["queryId"]), -d["total_score"]))
         for i, d in enumerate(reranked_docs):
             print("\n\n")
