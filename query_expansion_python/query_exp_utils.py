@@ -2,6 +2,7 @@ import nltk
 import torch
 import itertools
 import random
+import math
 
 from torch.nn import CosineSimilarity
 from nltk.corpus import wordnet as wn
@@ -208,10 +209,13 @@ def generate_similar_queries(input_query: str, verbose=False):
     return best_queries_list
 
 
-def impr_generate_similar_queries(input_query: str, verbose=False):
+def impr_generate_similar_queries(input_query: str, max_n_query=20, verbose=False):
+
+    if max_n_query <= 0:
+        print("Can't generate a negative number of new queries or no queries at all!")
+        return 1
 
     # Use first a BERT model to get a list of proposed words in place of masked ones
-    # mask_tokenizer = AutoTokenizer.from_pretrained("../bert-base-uncased")
     mask_tokenizer = AutoTokenizer.from_pretrained('../bert-base-uncased')
     mask_model = AutoModelForMaskedLM.from_pretrained("../bert-base-uncased")
     mask_model.eval()
@@ -231,6 +235,8 @@ def impr_generate_similar_queries(input_query: str, verbose=False):
         print(f"POS tagging result: {pos_tags_wn}\n")
     masked_words_indexes = [i for i in range(len(pos_tags_wn)) if _is_nltk_pos_tag_to_mask(pos_tags_wn[i][1])]
     original_masked_words = list(tokenized_query[i] for i in masked_words_indexes)
+    pos_tags_masked_words = list(pos_tags_wn[i][1] for i in masked_words_indexes)
+    n_masked_words = len(masked_words_indexes)              # Depending on this value we decide how many substitutions we can accept per masked token
 
     # Generate all the queries with [MASK] special token in place of the nouns
     masked_query_strings_list = list()
@@ -251,7 +257,8 @@ def impr_generate_similar_queries(input_query: str, verbose=False):
         best_tokens_list.append(best_tokens)
     if verbose:
         print(f"best_tokens_list: {best_tokens_list}")
-        print(f"original_masked_words: {original_masked_words}\n")
+        print(f"original_masked_words: {original_masked_words}")
+        print(f"pos_tags_masked_words: {pos_tags_masked_words}\n")
 
     # Use another BERT model and tokenizer to get the query embeddings
     emb_tokenizer = BertTokenizer.from_pretrained('../bert-base-uncased')
@@ -287,30 +294,35 @@ def impr_generate_similar_queries(input_query: str, verbose=False):
         if verbose:
             print(f"new_token_sim_dict: {new_token_sim_dict}\n")
 
-        sim_thresh = 0.8
-        # Perform an initial screening => accept only tokens with at least 80% similarity with the original "masked" ones
-        best_new_token_sim_dict = {k: v for k, v in new_token_sim_dict.items() if v >= sim_thresh}
+        # N.B. These variables values are chosen just according to a heuristics!
+        base_sim_thresh = 0.85                                              # Min threshold to consider two embeddings similar at first step
+        low_sim_thresh = 0.75                                               # Min threshold to consider two embeddings similar at second step
+        max_combinations = 5000                                             # Max number of query combinations, computed as: top_k^(n_masked_words)
+        top_k = math.floor(max_combinations ** (1 / n_masked_words))        # Min top_k value is 1 by definition
+
+        # Perform an initial screening => accept only tokens with at least base_sim_thresh similarity with the original "masked" ones
+        best_new_token_sim_dict = {k: v for k, v in new_token_sim_dict.items() if v >= base_sim_thresh}
         if verbose:
             print("Sub-dict of tokens with scores above sim_thresh: ", best_new_token_sim_dict)
 
         if len(best_new_token_sim_dict) > 1:
             # Default case: at least 1 out of 10 tokens initially proposed by BERT is good enough
-            # Guarantee that for each token there are at most 5 new tokens (to limit execution time while keeping results quality high)
-            if len(new_token_sim_dict) >= 5:  # Should always be true, since Bert retrieves top 10 tokens
-                # Sort the dictionary of candidates by score, keep only tokens with score above 0.7 and of these take top_5
+            # Guarantee that for each token there are at most top_k new tokens (to limit execution time while keeping results quality high)
+            if len(new_token_sim_dict) >= top_k:  # Should always be true, since Bert retrieves top 10 tokens
+                # Sort the dictionary of candidates by score, keep only tokens with score above low_sim_thresh and of these take top_k
                 sorted_new_token_sim_dict = {k: v for k, v in sorted(new_token_sim_dict.items(), reverse=True, key=lambda item: item[1])}
-                sorted_new_token_sim_dict_over_thresh = {k: v for k, v in sorted_new_token_sim_dict.items() if v >= 0.7}
-                best_new_token_sim_dict = {k: sorted_new_token_sim_dict_over_thresh[k] for k in list(sorted_new_token_sim_dict_over_thresh)[:5]}
+                sorted_new_token_sim_dict_over_thresh = {k: v for k, v in sorted_new_token_sim_dict.items() if v >= low_sim_thresh}
+                best_new_token_sim_dict = {k: sorted_new_token_sim_dict_over_thresh[k] for k in list(sorted_new_token_sim_dict_over_thresh)[:top_k]}
 
         elif len(best_new_token_sim_dict) == 1:
             # Special case: none of the 10 tokens initially proposed by BERT is good enough
             # => we need to extract new candidates, 20 per iteration (max 100), until at least one good token in the batch is found
-            n_words_to_extract = 20                         # We generate again the first 10, because we will lower sim_thresh to 0.7
+            n_words_to_extract = 20                                 # We generate again the first 10, because now we consider low_sim_thresh
             while len(best_new_token_sim_dict) <= 1 and n_words_to_extract < 100:
                 best_tokens = _get_bert_topk_predictions(mask_tokenizer, mask_model, masked_query_strings_list[i], original_masked_words[i],
                                                          n_words_to_extract)
                 if verbose:
-                    print(f"\nLet's analyze the BERT candidate tokens in the interval [{len(best_tokens) - 20}:{len(best_tokens)}] :")
+                    print(f"\nLet's analyze the next set of 20 BERT candidate tokens:")
 
                 new_token_sim_dict = dict()
                 for best_token in best_tokens[n_words_to_extract-20:n_words_to_extract]:        # Compute cos_sim only on new 20 tokens
@@ -330,16 +342,16 @@ def impr_generate_similar_queries(input_query: str, verbose=False):
 
                 # Add to best_new_token_sim_dict the words that, in the current batch of 20 candidates, have score above 0.7
                 for k in new_token_sim_dict.keys():
-                    if new_token_sim_dict[k] >= 0.7:
+                    if new_token_sim_dict[k] >= low_sim_thresh:
                         best_new_token_sim_dict[k] = new_token_sim_dict[k]
 
                 n_words_to_extract += 20
 
-            # If now, thanks to the lower similarity threshold, too many tokens are selected, keep only the best 5
-            if len(best_new_token_sim_dict) >= 5:
-                # Sort the dictionary of candidates by score, keep only tokens with score above 0.7 and of these take top_5
+            # If now, thanks to the lower similarity threshold, too many tokens are selected, keep only the best top_k
+            if len(best_new_token_sim_dict) >= top_k:
+                # Sort the dictionary of candidates by score, keep only tokens with score above 0.7 and of these take top_k
                 sorted_best_new_token_sim_dict = {k: v for k, v in sorted(best_new_token_sim_dict.items(), reverse=True, key=lambda item: item[1])}
-                best_new_token_sim_dict = {k: sorted_best_new_token_sim_dict[k] for k in list(sorted_best_new_token_sim_dict)[:5]}
+                best_new_token_sim_dict = {k: sorted_best_new_token_sim_dict[k] for k in list(sorted_best_new_token_sim_dict)[:top_k]}
 
         else:
             # This should never happen, since at least the original word should be 100% similar to itself
@@ -375,12 +387,12 @@ def impr_generate_similar_queries(input_query: str, verbose=False):
     if verbose:
         print(f"\nTotal number of queries generated: {len(new_queries_strings)}")
 
-    # If the number of queries generated is too high (> 20) then select a random (deterministic) subset
-    if len(new_queries_strings) > 20:
+    # If the number of queries generated is too high (> max_n_query) then select a random (deterministic) subset
+    if len(new_queries_strings) > max_n_query:
         random.seed(0)
         original_query = new_queries_strings[0]
-        new_queries_strings = random.sample(new_queries_strings, 19)
-        new_queries_strings.insert(0, original_query)                       # Don't forget to keep the original query
+        new_queries_strings = random.sample(new_queries_strings, max_n_query - 1)
+        new_queries_strings.insert(0, original_query)                                       # Don't forget to keep the original query
 
     if verbose:
         print(f"Final list of {len(new_queries_strings)} new queries: {new_queries_strings}\n")
@@ -388,10 +400,11 @@ def impr_generate_similar_queries(input_query: str, verbose=False):
     return new_queries_strings
 
 
-def impr_generate_similar_queries_no_model_reload(mask_tokenizer, mask_model, emb_tokenizer, emb_model, input_query_list, verbose=False):
+def generate_similar_queries_all_topics(mask_tokenizer, mask_model, emb_tokenizer, emb_model, input_query_list, verbose=False):
 
     new_queries_strings_list = list()
-    for input_query in input_query_list:
+    for t in range(len(input_query_list)):
+        input_query = input_query_list[t]
 
         tokenized_query = mask_tokenizer.tokenize(input_query)
         if verbose:
@@ -559,5 +572,6 @@ def impr_generate_similar_queries_no_model_reload(mask_tokenizer, mask_model, em
             print(f"Final list of {len(new_queries_strings)} new queries: {new_queries_strings}\n")
 
         new_queries_strings_list.append(new_queries_strings)
+        print(f"Ended processing topic n°{t}")
 
     return new_queries_strings_list
