@@ -3,7 +3,7 @@
 ## Requirements
 - Make
 - The Args.me corpus: https://zenodo.org/record/3734893#.YIV1SYNfi6k
-- The Argument Quality model: https://drive.google.com/u/0/uc?export=download&confirm=w1AV&id=12aSB-jCPnkJmTByV53IWIy_GHgTFP6bg
+- The Argument Quality models: https://drive.google.com/drive/folders/1x_oMuYorWAQ3JGBSCJKmFKewP_3YfuXW
 
 ## Usage
 
