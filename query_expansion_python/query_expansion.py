@@ -574,17 +574,18 @@ def main():
 
         start = time.time()
 
+        # Use just one tokenizer for the whole task
+        bert_tokenizer = BertTokenizerFast.from_pretrained('../bert-base-uncased')
+
         # Use first a BERT model to get a list of proposed words in place of masked ones
-        mask_tokenizer = AutoTokenizer.from_pretrained('../bert-base-uncased')
         mask_model = AutoModelForMaskedLM.from_pretrained("../bert-base-uncased")
         mask_model.eval()
 
         # Use another BERT model and tokenizer to get the query embeddings
-        emb_tokenizer = BertTokenizer.from_pretrained('../bert-base-uncased')
         emb_model = BertModel.from_pretrained("../bert-base-uncased", output_hidden_states=True)
         emb_model.eval()
 
-        all_new_queries_list = generate_similar_queries_all_topics(mask_tokenizer, mask_model, emb_tokenizer, emb_model, topic_list, verbose=False)
+        all_new_queries_list = generate_similar_queries_all_topics(bert_tokenizer, mask_model, emb_model, topic_list, max_n_query=20, verbose=False)
 
         for queries in all_new_queries_list:
             print(queries)
