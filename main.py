@@ -131,10 +131,16 @@ def get_quality_score(model, documents, alpha):
     for arg in arguments:
         args_with_score += model(arg)
 
-    max_rel = max([d["score"] for d in documents])
-    max_q = max([args_with_score[i][1] for i in range(len(args_with_score))])
-    print(f"MAX RELEVANCE = {max_rel} \n MAX QUALITY = {max_q}")
     type = 'normalize'
+        if type in ['normalize', 'hybrid']:
+            max_rel = {}
+            max_q = {}
+            query_ids = set([d['queryId'] for d in documents])
+            for query in query_ids:
+                max_rel[query] = max([d['score'] for d in documents if d['queryId'] == query])
+                max_q[query] = max([d['quality'] for d in documents if d['queryId'] == query])
+        print(f"MAX RELEVANCE = {max_rel} \n MAX QUALITY = {max_q}")
+
     for i, d in enumerate(documents):
             if type == 'sigmoid':
                 d["total_score"] = score(alpha, d["score"], args_with_score[i][1], type='sigmoid', beta=0.2)
