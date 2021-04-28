@@ -15,6 +15,7 @@ cssutils==2.2.0
 datasets==1.6.0
 dill==0.3.3
 docker-pycreds==0.4.0
+fastdist==1.1.2
 filelock==3.0.12
 fsspec==2021.4.0
 future==0.18.2
@@ -30,12 +31,14 @@ jeepney==0.6.0
 joblib==1.0.1
 keyring==23.0.1
 knockknock==0.1.8.1
+llvmlite==0.36.0
 lxml==4.6.3
 Markdown==3.3.4
 matrix-client==0.3.2
 multidict==5.1.0
 multiprocess==0.70.11.1
 nltk==3.6.2
+numba==0.53.1
 numpy==1.20.2
 oauthlib==3.1.0
 packaging==20.9
