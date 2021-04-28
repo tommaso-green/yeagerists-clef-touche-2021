@@ -105,7 +105,7 @@ def score(alpha, rel_score, q_score, type, **kwargs):
         sigmoid = lambda x: 1 / (1 + math.exp(-kwargs['beta'] * x))
         return (1 - alpha) * sigmoid(rel_score) + alpha * sigmoid(q_score)
     if type == 'normalize':
-        return (1 - alpha) * rel_score/kwargs['max_rel'] + alpha * q_score/kwargs['max_q']
+        return (1 - alpha) * rel_score / kwargs['max_rel'] + alpha * q_score / kwargs['max_q']
     if type == 'hybrid':
         sigmoid = lambda x: 1 / (1 + math.exp(-kwargs['beta'] * x))
         return (1 - alpha) * rel_score / kwargs['max_rel'] + alpha * sigmoid(q_score)
@@ -132,24 +132,25 @@ def get_quality_score(model, documents, alpha):
         args_with_score += model(arg)
 
     type = 'normalize'
-        if type in ['normalize', 'hybrid']:
-            max_rel = {}
-            max_q = {}
-            query_ids = set([d['queryId'] for d in documents])
-            for query in query_ids:
-                max_rel[query] = max([d['score'] for d in documents if d['queryId'] == query])
-                max_q[query] = max([d['quality'] for d in documents if d['queryId'] == query])
-        print(f"MAX RELEVANCE = {max_rel} \n MAX QUALITY = {max_q}")
+    if type in ['normalize', 'hybrid']:
+        max_rel = {}
+        max_q = {}
+        query_ids = set([d['queryId'] for d in documents])
+        for query in query_ids:
+            max_rel[query] = max([d['score'] for d in documents if d['queryId'] == query])
+            max_q[query] = max([d['quality'] for d in documents if d['queryId'] == query])
+
+    print(f"MAX RELEVANCE = {max_rel} \n MAX QUALITY = {max_q}")
 
     for i, d in enumerate(documents):
-            if type == 'sigmoid':
-                d["total_score"] = score(alpha, d["score"], args_with_score[i][1], type='sigmoid', beta=0.2)
-            if type == 'normalize':
-                d["total_score"] = score(alpha, d["score"], args_with_score[i][1], type='normalize',
-                                         max_rel=max_rel, max_q=max_q)
-            if type == 'hybrid':
-                d["total_score"] = score(alpha, d["score"], args_with_score[i][1], type='hybrid',
-                                         max_rel=max_rel, beta=0.2)
+        if type == 'sigmoid':
+            d["total_score"] = score(alpha, d["score"], args_with_score[i][1], type='sigmoid', beta=0.2)
+        if type == 'normalize':
+            d["total_score"] = score(alpha, d["score"], args_with_score[i][1], type='normalize',
+                                     max_rel=max_rel, max_q=max_q)
+        if type == 'hybrid':
+            d["total_score"] = score(alpha, d["score"], args_with_score[i][1], type='hybrid',
+                                     max_rel=max_rel, beta=0.2)
 
     return documents
 
