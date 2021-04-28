@@ -12,6 +12,7 @@ public class ResultArgument {
     private String id;
     private String stance;
     private String body;
+    private String title;
     private float score;
     private String queryId;
 }

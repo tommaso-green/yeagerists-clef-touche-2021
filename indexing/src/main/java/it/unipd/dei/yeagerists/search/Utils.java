@@ -100,6 +100,7 @@ public class Utils {
                     .queryId(queryId)
                     .id(indexedDoc.get(ParsedArgument.FIELDS.ID))
                     .body(indexedDoc.get(ParsedArgument.FIELDS.BODY))
+                    .title(indexedDoc.get(ParsedArgument.FIELDS.TITLE))
                     .stance(indexedDoc.get(ParsedArgument.FIELDS.STANCE))
                     .build();
 

@@ -80,7 +80,7 @@ public class ArgsParser implements Iterator<ParsedArgument>, Iterable<ParsedArgu
     }
 
     private ParsedArgument parse() throws IOException {
-        String id = null, body = null, stance = null;
+        String id = null, body = null, stance = null, title = null;
 
         if (parser.getCurrentToken() != JsonToken.START_OBJECT)
             throw new IllegalStateException("Expecting start of object");
@@ -114,25 +114,41 @@ public class ArgsParser implements Iterator<ParsedArgument>, Iterable<ParsedArgu
             if (nestedObjCount == 1 && currToken == JsonToken.FIELD_NAME) {
 
                 switch (parser.getText()) {
+                    // Text inside nested object "premises"
                     case "text":
                         parser.nextToken();
                         log.fine("Found body: " + parser.getText());
                         if (body != null) {
-                            log.warning(String.format("found multiple texts for argument %s", body));
+                            log.warning(String.format("found multiple texts for argument %s", id));
                         }
                         body = parser.getText();
                         break;
+                    // Stance inside nested object "premises"
                     case "stance":
+                        // Stance inside nested object "premises"
                         parser.nextToken();
                         log.fine("Found stance: " + parser.getText());
                         if (stance != null) {
-                            log.warning(String.format("found multiple stances for argument %s", stance));
+                            log.warning(String.format("found multiple stances for argument %s", id));
                         }
                         stance = parser.getText();
+                        break;
+                    // Discussion title inside nested object "context"
+                    case "discussionTitle":
+                        parser.nextToken();
+                        log.fine("Found title: " + parser.getText());
+                        if (title != null) {
+                            log.warning(String.format("found multiple titles for argument %s", id));
+                        }
+                        title = parser.getText();
                         break;
                 }
             }
 
+        }
+
+        if (title == null) {
+            title = "";
         }
 
         if (id == null || body == null || stance == null) {
@@ -141,6 +157,6 @@ public class ArgsParser implements Iterator<ParsedArgument>, Iterable<ParsedArgu
 
         // Move to next argument - if no argument next token will be END_ARRAY
         parser.nextToken();
-        return new ParsedArgument(id, body, stance);
+        return new ParsedArgument(id, body, stance, title);
     }
 }
