@@ -399,7 +399,7 @@ def impr_generate_similar_queries(input_query: str, max_n_query=20, verbose=Fals
     return new_queries_strings
 
 
-def generate_similar_queries_all_topics(input_query_list, max_n_query=20, verbose=False):
+def generate_similar_queries_all_topics(input_query_list, max_n_query=10, verbose=False):
 
     if max_n_query <= 0:
         print("Can't generate a negative number of new queries or no queries at all!")

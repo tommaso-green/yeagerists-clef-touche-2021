@@ -38,8 +38,8 @@ def main(args=None):
         start = datetime.now()
         print('-->Starting Query Expansion')
 
-        ids, new_queries = expand_queries(queries)
-        write_queries_to_file(args.querypath, new_queries, ids)
+        new_queries_list = expand_queries(queries)
+        write_queries_to_file(args.querypath, new_queries_list, ids)
 
         print('Time taken for Query Expansion: ', datetime.now() - start)
     else:
@@ -95,11 +95,6 @@ def save_run(documents, directory, args):
         f.write(f"nDGC at 5: {nDCG}")
 
 
-def expand_query(query: str):
-    new_queries_list = impr_generate_similar_queries(query, verbose=False)
-    return [query_id for query_id in range(len(new_queries_list))], new_queries_list
-
-
 def score(alpha, rel_score, q_score, type, **kwargs):
     if type == 'sigmoid':
         sigmoid = lambda x: 1 / (1 + math.exp(-kwargs['beta'] * x))
@@ -112,15 +107,8 @@ def score(alpha, rel_score, q_score, type, **kwargs):
 
 
 def expand_queries(queries: [str]):
-    ret_ids = []
-    ret_queries = []
-    for q in queries:
-        print(f"Expanding query {q}")
-        ids, new_queries = expand_query(q)
-        ret_ids.append(ids)
-        ret_queries.append(queries)
-
-    return ret_ids, ret_queries
+    new_queries_list = generate_similar_queries_all_topics(queries, max_n_query=10, verbose=False)
+    return new_queries_list
 
 
 def get_quality_score(model, documents, args):
@@ -151,22 +139,29 @@ def get_quality_score(model, documents, args):
     return documents
 
 
-def write_queries_to_file(path: str, queries: [str], ids: [str]):
+def write_queries_to_file(path: str, new_queries_list: [[str]], ids: [str]):
     with open(path, "w+") as f:
         f.write("<topics>")
 
-        for i in range(len(queries)):
-            f.write("<topic>")
+        # For each list of (max) 10 new queries associated to a topic
+        for i in range(len(new_queries_list)):
+            new_queries = new_queries_list[i]
 
-            f.write("<number>")
-            f.write(str(ids[i]))
-            f.write("</number>")
+            # For each single query of these lists of (max) 10 new queries
+            for j in range(len(new_queries)):
+                new_query = new_queries[j]
 
-            f.write("<title>")
-            f.write(queries[i])
-            f.write("</title>")
+                f.write("<topic>")
 
-            f.write("</topic>")
+                f.write("<number>")
+                f.write(str(ids[i]))
+                f.write("</number>")
+
+                f.write("<title>")
+                f.write(str(new_query))
+                f.write("</title>")
+
+                f.write("</topic>")
 
         f.write("</topics>")
     f.close()

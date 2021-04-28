@@ -9,11 +9,51 @@ from scipy.spatial.distance import cosine
 import nltk
 import torch
 import xmltodict
+from datetime import datetime
 from nltk.corpus import wordnet as wn
 from textblob import TextBlob
 from transformers import GPT2Tokenizer, GPT2LMHeadModel, pipeline, BeamSearchScorer, AutoModelForMaskedLM, AutoTokenizer, BertTokenizer, BertModel
 
 from query_exp_utils import *
+
+
+def write_queries_to_file(path: str, new_queries_list: [[str]], ids: [str]):
+    with open(path, "w+") as f:
+        f.write("<topics>")
+
+        for i in range(len(new_queries_list)):          # For each list of (max) 10 new queries associated to a topic
+            new_queries = new_queries_list[i]
+
+            for j in range(len(new_queries)):           # For each single query of these lists of (max) 10 new queries
+                f.write("<topic>")
+
+                f.write("<number>")
+                f.write(str(ids[i]))
+                f.write("</number>")
+
+                f.write("<title>")
+                f.write(str(new_queries[j]))
+                f.write("</title>")
+
+                f.write("</topic>")
+
+        f.write("</topics>")
+    f.close()
+
+
+def expand_queries(queries: [str]):
+    new_queries_list = generate_similar_queries_all_topics(queries, max_n_query=10, verbose=False)
+    return new_queries_list
+
+
+def read_topics(topics_path):
+    f = open(topics_path, "r")
+    xml_data = f.read()
+    my_dict = xmltodict.parse(xml_data)
+
+    topic_dicts = my_dict['topics']['topic']
+    t_list = [(int(x['number']), x['title']) for x in topic_dicts]
+    return sorted(t_list, key=lambda x: x[0])
 
 
 def get_topic_list(filename):
@@ -582,6 +622,22 @@ def main():
 
         end = time.time()
         print(f"Runtime of the program is {end - start}")
+
+    elif task == 10:
+
+        topic_list = read_topics("../datasets/touche2021topics/topics-task-1-only-titles-truncated.xml")
+        print(f"Topic List size: {len(topic_list)}")
+
+        ids = [x[0] for x in topic_list]
+        queries = [x[1] for x in topic_list]
+
+        start = datetime.now()
+        print('-->Starting Query Expansion')
+
+        new_queries_list = expand_queries(queries)
+        write_queries_to_file("../expanded_queries.xml", new_queries_list, ids)
+
+        print('Time taken for Query Expansion: ', datetime.now() - start)
 
 
 if __name__ == "__main__":
