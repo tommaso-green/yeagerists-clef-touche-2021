@@ -7,8 +7,11 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.benchmark.quality.QualityQuery;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.queryparser.classic.MultiFieldQueryParser;
 import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.queryparser.classic.QueryParserBase;
 import org.apache.lucene.search.*;
 import org.apache.lucene.search.similarities.Similarity;
 import org.apache.lucene.store.FSDirectory;
@@ -30,7 +33,8 @@ public class Searcher {
      */
     private final List<QualityQuery> queries;
 
-    private final QueryParser queryParser;
+    private final MultiFieldQueryParser queryParser;
+
     private final int maxDocsRetrieved;
 
     /**
@@ -40,6 +44,7 @@ public class Searcher {
      * @param similarity       the {@code Similarity} to be used.
      * @param indexPath        the directory where containing the index to be searched.
      * @param topicsFile       the file containing the topics to search for.
+     * @param titleBoost       the boost given to title hits
      * @param maxDocsRetrieved the maximum number of documents to be retrieved.
      * @throws NullPointerException     if any of the parameters is {@code null}.
      * @throws IllegalArgumentException if any of the parameters assumes invalid values.
@@ -49,6 +54,7 @@ public class Searcher {
             @NonNull final Similarity similarity,
             @NonNull final String indexPath,
             @NonNull final String topicsFile,
+            @NonNull final Float titleBoost,
             @NonNull final int maxDocsRetrieved) {
 
         if (indexPath.isEmpty()) {
@@ -91,7 +97,13 @@ public class Searcher {
         searcher = new IndexSearcher(reader);
         searcher.setSimilarity(similarity);
 
-        queryParser = new QueryParser(ParsedArgument.FIELDS.BODY, analyzer);
+        final Map<String, Float> boosts = new HashMap<>();
+        boosts.put(ParsedArgument.FIELDS.BODY, 1.0f);
+        boosts.put(ParsedArgument.FIELDS.TITLE, titleBoost);
+        queryParser = new MultiFieldQueryParser(
+                new String[] {ParsedArgument.FIELDS.BODY, ParsedArgument.FIELDS.TITLE},
+                analyzer,
+                boosts);
 
         this.maxDocsRetrieved = maxDocsRetrieved;
     }
