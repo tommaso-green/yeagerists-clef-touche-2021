@@ -8,17 +8,22 @@ from torchmetrics import R2Score
 
 class ArgQualityModel(pl.LightningModule):
 
-    def __init__(self, model_name, learning_rate, weight_decay):
+    def __init__(self, model_name, learning_rate, weight_decay, dropout_prob):
         super().__init__()
 
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
+        self.dropout_prob = dropout_prob
+        self.dropout = nn.AlphaDropout(self.dropout_prob)
 
         # BERT encoder
         self.encoder = AutoModel.from_pretrained(model_name)
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.ffn = nn.Sequential(nn.Linear(768, 512), nn.ReLU(), nn.Linear(512, 256), nn.ReLU(),
-                                 nn.Linear(256, 1))
+        if self.dropout_prob > 0:
+            self.ffn = nn.Sequential(nn.Linear(768, 512), nn.SELU(), nn.AlphaDropout(self.dropout_prob), nn.Linear(512, 256), nn.SELU(), nn.AlphaDropout(self.dropout_prob), nn.Linear(256, 1))
+        else:
+            self.ffn = nn.Sequential(nn.Linear(768, 512), nn.ReLU(), nn.Linear(512, 256), nn.ReLU(),
+                                     nn.Linear(256, 1))
 
         self.loss_fn = nn.MSELoss()
         self.train_r2score = R2Score()
@@ -34,6 +39,7 @@ class ArgQualityModel(pl.LightningModule):
         batch_input = self.tokenizer(batch, padding=True, truncation=True, return_tensors='pt')
         encoder_output = self.encoder(**batch_input, output_hidden_states=True)  # BERT pass
         cls_emb = encoder_output.last_hidden_state[:, 0, :]
+        cls_emb = self.dropout(cls_emb)
         batch_scores = self.ffn(cls_emb)
 
         textual_args = self.tokenizer.batch_decode(batch_input['input_ids'], skip_special_tokens=True)
@@ -44,6 +50,7 @@ class ArgQualityModel(pl.LightningModule):
         batch_input, batch_targets = batch
         encoder_output = self.encoder(**batch_input, output_hidden_states=True)  # BERT pass
         cls_emb = encoder_output.last_hidden_state[:, 0, :]
+        cls_emb = self.dropout(cls_emb)
         batch_scores = self.ffn(cls_emb)
 
         loss = self.loss_fn(batch_scores, batch_targets)
@@ -59,6 +66,7 @@ class ArgQualityModel(pl.LightningModule):
         batch_input, batch_targets = batch
         encoder_output = self.encoder(**batch_input, output_hidden_states=True)  # BERT pass
         cls_emb = encoder_output.last_hidden_state[:, 0, :]
+        cls_emb = self.dropout(cls_emb)
         batch_scores = self.ffn(cls_emb)
 
         loss = self.loss_fn(batch_scores, batch_targets)
@@ -72,6 +80,7 @@ class ArgQualityModel(pl.LightningModule):
         batch_input, batch_targets = batch
         encoder_output = self.encoder(**batch_input, output_hidden_states=True)  # BERT pass
         cls_emb = encoder_output.last_hidden_state[:, 0, :]
+        cls_emb = self.dropout(cls_emb)
         batch_scores = self.ffn(cls_emb)
 
         loss = self.loss_fn(batch_scores, batch_targets)
