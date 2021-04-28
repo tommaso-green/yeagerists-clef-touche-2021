@@ -554,16 +554,6 @@ def main():
 
         start = time.time()
 
-        # # Use first a BERT model to get a list of proposed words in place of masked ones
-        # mask_tokenizer = AutoTokenizer.from_pretrained('../bert-base-uncased')
-        # mask_model = AutoModelForMaskedLM.from_pretrained("../bert-base-uncased")
-        # mask_model.eval()
-        #
-        # # Use another BERT model and tokenizer to get the query embeddings
-        # emb_tokenizer = BertTokenizer.from_pretrained('../bert-base-uncased')
-        # emb_model = BertModel.from_pretrained("../bert-base-uncased", output_hidden_states=True)
-        # emb_model.eval()
-
         # for i in range(50):
         #     all_new_queries = impr_generate_similar_queries(topic_list[i], verbose=False)
         #     print(f"Number of new queries: {len(all_new_queries)}\n")
@@ -571,9 +561,7 @@ def main():
         #         print(query)
         #     print()
 
-        # all_new_queries_list = generate_similar_queries_all_topics(mask_tokenizer, mask_model, emb_tokenizer, emb_model, topic_list, verbose=False)
-
-        all_new_queries = impr_generate_similar_queries(topic_list[7], max_n_query=30, verbose=True)
+        all_new_queries = impr_generate_similar_queries(topic_list[5], max_n_query=20, verbose=True)
         print(f"Number of new queries: {len(all_new_queries)}\n")
         for query in all_new_queries:
             print(query)
@@ -582,9 +570,28 @@ def main():
         end = time.time()
         print(f"Runtime of the program is {end - start}")
 
-        # for queries in all_new_queries_list:
-        #     print(queries)
-        # print()
+    elif task == 9:
+
+        start = time.time()
+
+        # Use first a BERT model to get a list of proposed words in place of masked ones
+        mask_tokenizer = AutoTokenizer.from_pretrained('../bert-base-uncased')
+        mask_model = AutoModelForMaskedLM.from_pretrained("../bert-base-uncased")
+        mask_model.eval()
+
+        # Use another BERT model and tokenizer to get the query embeddings
+        emb_tokenizer = BertTokenizer.from_pretrained('../bert-base-uncased')
+        emb_model = BertModel.from_pretrained("../bert-base-uncased", output_hidden_states=True)
+        emb_model.eval()
+
+        all_new_queries_list = generate_similar_queries_all_topics(mask_tokenizer, mask_model, emb_tokenizer, emb_model, topic_list, verbose=False)
+
+        for queries in all_new_queries_list:
+            print(queries)
+        print()
+
+        end = time.time()
+        print(f"Runtime of the program is {end - start}")
 
 
 if __name__ == "__main__":

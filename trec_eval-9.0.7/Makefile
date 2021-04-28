@@ -1,4 +1,5 @@
-BIN = /usr/local/bin
+#BIN = /usr/local/bin
+BIN = %USERPROFILE%
 #   Copyright (c) 2008 - Chris Buckley. 
 #
 #   Permission is granted for use and modification of this file for

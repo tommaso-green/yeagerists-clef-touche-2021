@@ -6,7 +6,7 @@ import math
 
 from torch.nn import CosineSimilarity
 from nltk.corpus import wordnet as wn
-from transformers import AutoTokenizer, AutoModelForMaskedLM, BertTokenizer, BertModel
+from transformers import AutoTokenizer, AutoModelForMaskedLM, BertTokenizer, BertModel, BertTokenizerFast
 from scipy.spatial.distance import cosine
 from fastdist import fastdist
 
@@ -216,7 +216,8 @@ def impr_generate_similar_queries(input_query: str, max_n_query=20, verbose=Fals
         return 1
 
     # Use first a BERT model to get a list of proposed words in place of masked ones
-    mask_tokenizer = AutoTokenizer.from_pretrained('../bert-base-uncased')
+    # mask_tokenizer = AutoTokenizer.from_pretrained('../bert-base-uncased')
+    mask_tokenizer = BertTokenizerFast.from_pretrained('../bert-base-uncased')
     mask_model = AutoModelForMaskedLM.from_pretrained("../bert-base-uncased")
     mask_model.eval()
 
@@ -261,7 +262,8 @@ def impr_generate_similar_queries(input_query: str, max_n_query=20, verbose=Fals
         print(f"pos_tags_masked_words: {pos_tags_masked_words}\n")
 
     # Use another BERT model and tokenizer to get the query embeddings
-    emb_tokenizer = BertTokenizer.from_pretrained('../bert-base-uncased')
+    # emb_tokenizer = BertTokenizer.from_pretrained('../bert-base-uncased')
+    emb_tokenizer = BertTokenizerFast.from_pretrained('../bert-base-uncased')
     emb_model = BertModel.from_pretrained("../bert-base-uncased", output_hidden_states=True)
     emb_model.eval()
 
@@ -299,6 +301,7 @@ def impr_generate_similar_queries(input_query: str, max_n_query=20, verbose=Fals
         low_sim_thresh = 0.75                                               # Min threshold to consider two embeddings similar at second step
         max_combinations = 5000                                             # Max number of query combinations, computed as: top_k^(n_masked_words)
         top_k = math.floor(max_combinations ** (1 / n_masked_words))        # Min top_k value is 1 by definition
+        top_k = top_k if top_k <= 10 else 10                                # Max top_k value have to be 10, otherwise errors arise!
 
         # Perform an initial screening => accept only tokens with at least base_sim_thresh similarity with the original "masked" ones
         best_new_token_sim_dict = {k: v for k, v in new_token_sim_dict.items() if v >= base_sim_thresh}
