@@ -9,6 +9,7 @@ public class ParsedArgument {
         public static final String ID = "id";
         public static final String BODY = "body";
         public static final String STANCE = "stance";
+        public static final String TITLE = "title";
     }
 
     @Setter(value = AccessLevel.NONE) // disable setter for this field
@@ -22,6 +23,10 @@ public class ParsedArgument {
     @Setter(value = AccessLevel.NONE)
     @NonNull
     private final String stance;
+
+    @Setter(value = AccessLevel.NONE)
+    @NonNull
+    private final String title;
 
     public boolean isValid() {
         return !body.isEmpty()

@@ -24,11 +24,12 @@ def main(args=None):
     topic_list = read_topics(args.topicpath)
     print(f"Topic List size: {len(topic_list)}")
 
-    arg_quality_model = ArgQualityModel.load_from_checkpoint(args.ckpt)
-    arg_quality_model.eval()
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    print(f"Device {device}")
-    arg_quality_model.to(device)
+    if args.alpha != 0:
+        arg_quality_model = ArgQualityModel.load_from_checkpoint(args.ckpt)
+        arg_quality_model.eval()
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        print(f"Device {device}")
+        arg_quality_model.to(device)
 
     ids = [x[0] for x in topic_list]
     queries = [x[1] for x in topic_list]
@@ -44,7 +45,7 @@ def main(args=None):
         print('\n--->No query expansion')
         write_queries_to_file(args.querypath, queries, ids)
 
-    java_args = f"--search --path {args.indexpath} --queries {args.querypath} --results {args.resultpath} --max {args.maxdocs}"
+    java_args = f"--search --path {args.indexpath} --queries {args.querypath} --results {args.resultpath} --max {args.maxdocs} --titleboost {args.titleboost}"
     os.system("java -jar indexing/target/indexing-1.0-SNAPSHOT-jar-with-dependencies.jar " + java_args)
 
     # Each result document contains: queryId, id, body, stance, score
@@ -174,6 +175,7 @@ def parse_args(args):
     parser.add_argument('-m', '--maxdocs', type=str, default="10")
     parser.add_argument('-qe', '--queryexp', action='store_true')
     parser.add_argument('-a', '--alpha', type=float, default=0.3)
+    parser.add_argument('-tb', '--titleboost', type=float, default=0)
     parser.add_argument('-n', '--name', type=str, default="dev_run")
     return parser.parse_args(args)
 
