@@ -1,6 +1,8 @@
-import argparse
 import os
 import json
+import subprocess
+import sys
+
 import torch.cuda
 import xmltodict
 from argument_quality.model import *
@@ -8,9 +10,118 @@ from query_expansion_python.query_exp_utils import *
 from datetime import datetime
 
 
+def main(args=None):
+    if not args:
+        args = parse_args(sys.argv[1:])
+
+    dir_path = f"./data/experiment/{args.name}"
+    try:
+        os.makedirs(dir_path)
+    except OSError:
+        print(f"Error creating results directory {dir_path}, if the dir already exists change run name")
+        return
+
+    topic_list = read_topics(args.topicpath)
+    print(f"Topic List size: {len(topic_list)}")
+
+    arg_quality_model = ArgQualityModel.load_from_checkpoint(args.ckpt)
+    arg_quality_model.eval()
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(f"Device {device}")
+    arg_quality_model.to(device)
+
+    ids = [x[0] for x in topic_list]
+    queries = [x[1] for x in topic_list]
+    if args.queryexp:
+        start = datetime.now()
+        print('-->Starting Query Expansion')
+
+        ids, new_queries = expand_queries(queries)
+        write_queries_to_file(args.querypath, new_queries, ids)
+
+        print('Time taken for Query Expansion: ', datetime.now() - start)
+    else:
+        print('\n--->No query expansion')
+        write_queries_to_file(args.querypath, queries, ids)
+
+    java_args = f"--search --path {args.indexpath} --queries {args.querypath} --results {args.resultpath} --max {args.maxdocs}"
+    os.system("java -jar indexing/target/indexing-1.0-SNAPSHOT-jar-with-dependencies.jar " + java_args)
+
+    # Each result document contains: queryId, id, body, stance, score
+    documents = read_results(args.resultpath)
+    print(f"--->Number of documents retrieved from index: {len(documents)}")
+
+    if args.alpha > 0:
+        start = datetime.now()
+
+        print(f'Running quality re-ranking for {len(documents)} arguments')
+        # Add 'total_score' to each doc considering predicted quality
+        documents = get_quality_score(arg_quality_model, documents, args.alpha)
+        re_ranked_docs = sorted(documents, key=lambda doc: (int(doc["queryId"]), -doc["total_score"]))
+
+        print('Time for quality re-ranking: ', datetime.now() - start)
+    else:
+        print("\n--> No Argument Quality Reranking")
+        for i, d in enumerate(documents):
+            d["total_score"] = d["score"]
+        re_ranked_docs = sorted(documents, key=lambda doc: (int(doc["queryId"]), -doc["total_score"]))
+
+    save_run(documents=re_ranked_docs, directory=dir_path, args=args)
+
+
+def save_run(documents, directory, args):
+    # Save runfile
+    rank = 0
+    # Get lowest query id (should be 1)
+    query_counter = documents[0]['queryId']
+    with open(directory + "/run.txt", "w") as f:
+        for d in documents:
+            if d['queryId'] == query_counter:
+                rank += 1
+            else:
+                rank = 1
+                query_counter = d['queryId']
+            f.write(f"{d['queryId']} QO {d['id']} {rank} {d['total_score']:.3f} {args.name}\n")
+
+    # Save arguments
+    with open(directory + "/args.txt", "w") as f:
+        f.write(str(args.__dict__))
+
+    # Save nDCG@5 for quick read
+    nDCG = float(subprocess.check_output("make -s evaluate | grep ndcg_cut_5 | head -1", shell=True).split()[2])
+    with open(directory + "/ndcg5_" + str(nDCG), "w") as f:
+        f.write(f"nDGC at 5: {nDCG}")
+
+
 def expand_query(query: str):
     new_queries_list = impr_generate_similar_queries(query, verbose=False)
     return [query_id for query_id in range(len(new_queries_list))], new_queries_list
+
+
+def expand_queries(queries: [str]):
+    ret_ids = []
+    ret_queries = []
+    for q in queries:
+        print(f"Expanding query {q}")
+        ids, new_queries = expand_query(q)
+        ret_ids.append(ids)
+        ret_queries.append(queries)
+
+    return ret_ids, ret_queries
+
+
+def get_quality_score(model, documents, alpha):
+    arguments = [d["body"] for d in documents]
+    args_with_score = []
+
+    # todo check if there's any improvement by dividing arguments in small batches
+    for arg in arguments:
+        args_with_score += model(arg)
+
+    for i, d in enumerate(documents):
+        d["total_score"] = (1 - alpha) * d["score"] + alpha * args_with_score[i][1]
+
+    return documents
 
 
 def write_queries_to_file(path: str, queries: [str], ids: [str]):
@@ -35,7 +146,6 @@ def write_queries_to_file(path: str, queries: [str], ids: [str]):
 
 
 def read_results(res_path: str):
-    res = []
     with open(res_path) as f:
         res = json.load(f)
     f.close()
@@ -52,102 +162,20 @@ def read_topics(topics_path):
     return sorted(t_list, key=lambda x: x[0])
 
 
-def main():
+def parse_args(args):
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--indexpath', type=str, default="data/index")
     parser.add_argument('-q', '--querypath', type=str, default="data/_tmp_queries.xml")
     parser.add_argument('-r', '--resultpath', type=str, default="data/res.txt")
     parser.add_argument('-t', '--topicpath', type=str,
                         default="datasets/touche2021topics/topics-task-1-only-titles.xml")
-    parser.add_argument('-c', '--ckpt', type=str, default="argument_quality/model_checkpoints/bert-base-uncased_best-epoch=04-val_r2=0.69.ckpt")
+    parser.add_argument('-c', '--ckpt', type=str,
+                        default="argument_quality/model_checkpoints/bert-base-uncased_best-epoch=04-val_r2=0.69.ckpt")
     parser.add_argument('-m', '--maxdocs', type=str, default="10")
     parser.add_argument('-qe', '--queryexp', action='store_true')
     parser.add_argument('-a', '--alpha', type=float, default=0.3)
     parser.add_argument('-n', '--name', type=str, default="dev_run")
-    args = parser.parse_args()
-
-    topic_list = read_topics(args.topicpath)
-    print(f"Topic List size: {len(topic_list)}")
-
-    arg_quality_model = ArgQualityModel.load_from_checkpoint(args.ckpt)
-    arg_quality_model.eval()
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    print(f"Device {device}")
-    arg_quality_model.to(device)
-
-    ids = [x[0] for x in topic_list]
-    queries = [x[1] for x in topic_list]
-    if args.queryexp:
-        start = datetime.now()
-        print('-->Starting Query Expansion')
-        tot_queries = []  # just for debugging
-        for q in queries:
-            print(f"Expanding query {q}")
-            ids, new_queries = expand_query(q)
-            tot_queries.append(new_queries)
-            write_queries_to_file(args.querypath, new_queries, ids)
-        end = datetime.now()
-        time_taken = end - start
-        print('Time taken for Query Expansion: ', time_taken)
-    else:
-        print('\n--->No query expansion')
-        write_queries_to_file(args.querypath, queries, ids)
-    java_args = f"--search --path {args.indexpath} --queries {args.querypath} --results {args.resultpath} --max {args.maxdocs}"
-    os.system("java -jar indexing/target/indexing-1.0-SNAPSHOT-jar-with-dependencies.jar " + java_args)
-
-    documents = read_results(args.resultpath)
-    print(f"--->Documents retrieved {len(documents)}")
-    for d in documents:
-        print("\n\n")
-        print("Query id: %s" % d["queryId"])
-        print("Doc id: %s" % d["id"])
-        print("Doc body: %s" % d["body"])
-        print("Doc stance: %s" % d["stance"])
-        print("Doc score: %s" % d["score"])
-
-    if args.alpha > 0:
-        arguments = [d["body"] for d in documents]
-        args_with_score = []
-        start = datetime.now()
-        # todo check if there's any improvement by dividing arguments in small batches
-        for arg in arguments:
-            args_with_score += arg_quality_model(arg)
-        end = datetime.now()
-        time_taken = end - start
-        print('Time for Query Expansion: ', time_taken)
-
-        print("\n" + "*" * 5 + "RERANKED LIST" + "*" * 5)
-        for i, d in enumerate(documents):
-            d["total_score"] = (1 - args.alpha) * d["score"] + args.alpha * args_with_score[i][1]
-        reranked_docs = sorted(documents, key=lambda d: (int(d["queryId"]), -d["total_score"]))
-        for i, d in enumerate(reranked_docs):
-            print("\n\n")
-            print("Query id: %s" % d["queryId"])
-            print("Doc id: %s" % d["id"])
-            print("Doc body: %s" % d["body"])
-            print("Doc stance: %s" % d["stance"])
-            print("Doc score: %s" % d["score"])
-            print("Doc quality: %s" % args_with_score[i][1])
-            print("Doc total score: %s" % d["total_score"])
-
-    else:
-        print("\n--> No Argument Quality Reranking")
-        for i, d in enumerate(documents):
-            d["total_score"] = d["score"]
-        reranked_docs = sorted(documents, key=lambda d: (int(d["queryId"]), -d["total_score"]))
-
-    rank = 0
-    query_counter = reranked_docs[0]['queryId']
-    with open("run.txt", "w") as f:
-        for d in reranked_docs:
-            if d['queryId'] == query_counter:
-                rank += 1
-            else:
-                rank = 1
-                query_counter = d['queryId']
-            f.write(f"{d['queryId']} QO {d['id']} {rank} {d['total_score']:.3f} {args.name}\n")
-
-    f.close()
+    return parser.parse_args(args)
 
 
 if __name__ == "__main__":
