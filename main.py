@@ -58,7 +58,7 @@ def main(args=None):
 
         print(f'Running quality re-ranking for {len(documents)} arguments')
         # Add 'total_score' to each doc considering predicted quality
-        documents = get_quality_score(arg_quality_model, documents, args.alpha)
+        documents = get_quality_score(arg_quality_model, documents, args)
         re_ranked_docs = sorted(documents, key=lambda doc: (int(doc["queryId"]), -doc["total_score"]))
 
         print('Time for quality re-ranking: ', datetime.now() - start)
@@ -123,16 +123,12 @@ def expand_queries(queries: [str]):
     return ret_ids, ret_queries
 
 
-def get_quality_score(model, documents, alpha):
-    arguments = [d["body"] for d in documents]
-    args_with_score = []
-
+def get_quality_score(model, documents, args):
     # todo check if there's any improvement by dividing arguments in small batches
-    for arg in arguments:
-        args_with_score += model(arg)
+    for d in documents:
+        d['quality'] = 0.1 #model(d['body'])
 
-    type = 'normalize'
-    if type in ['normalize', 'hybrid']:
+    if args.type in ['normalize', 'hybrid']:
         max_rel = {}
         max_q = {}
         query_ids = set([d['queryId'] for d in documents])
@@ -142,15 +138,15 @@ def get_quality_score(model, documents, alpha):
 
     print(f"MAX RELEVANCE = {max_rel} \n MAX QUALITY = {max_q}")
 
-    for i, d in enumerate(documents):
+    for d in documents:
         if type == 'sigmoid':
-            d["total_score"] = score(alpha, d["score"], args_with_score[i][1], type='sigmoid', beta=0.2)
+            d["total_score"] = score(args.alpha, d["score"], d["quality"], type='sigmoid', beta=args.beta)
         if type == 'normalize':
-            d["total_score"] = score(alpha, d["score"], args_with_score[i][1], type='normalize',
+            d["total_score"] = score(args.alpha, d["score"], d["quality"], type='normalize',
                                      max_rel=max_rel, max_q=max_q)
         if type == 'hybrid':
-            d["total_score"] = score(alpha, d["score"], args_with_score[i][1], type='hybrid',
-                                     max_rel=max_rel, beta=0.2)
+            d["total_score"] = score(args.alpha, d["score"], d["quality"], type='hybrid',
+                                     max_rel=max_rel, beta=args.beta)
 
     return documents
 
@@ -207,7 +203,8 @@ def parse_args(args):
     parser.add_argument('-a', '--alpha', type=float, default=0.3)
     parser.add_argument('-tb', '--titleboost', type=float, default=0)
     parser.add_argument('-n', '--name', type=str, default="dev_run")
-
+    parser.add_argument('--type', type=str, default="normalize")
+    parser.add_argument('--beta', type=float, default=0.2)
     return parser.parse_args(args)
 
 
