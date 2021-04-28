@@ -215,13 +215,14 @@ def impr_generate_similar_queries(input_query: str, max_n_query=20, verbose=Fals
         print("Can't generate a negative number of new queries or no queries at all!")
         return 1
 
+    # Use just one tokenizer for the whole task
+    bert_tokenizer = BertTokenizerFast.from_pretrained('../bert-base-uncased')
+
     # Use first a BERT model to get a list of proposed words in place of masked ones
-    # mask_tokenizer = AutoTokenizer.from_pretrained('../bert-base-uncased')
-    mask_tokenizer = BertTokenizerFast.from_pretrained('../bert-base-uncased')
     mask_model = AutoModelForMaskedLM.from_pretrained("../bert-base-uncased")
     mask_model.eval()
 
-    tokenized_query = mask_tokenizer.tokenize(input_query)
+    tokenized_query = bert_tokenizer.tokenize(input_query)
     if verbose:
         print(f"Original tokenized_query: {tokenized_query}")
 
@@ -243,7 +244,7 @@ def impr_generate_similar_queries(input_query: str, max_n_query=20, verbose=Fals
     masked_query_strings_list = list()
     for word_index_to_mask in masked_words_indexes:
         tokenized_query_to_mask = list(tokenized_query)  # Just take a copy not to touch
-        tokenized_query_to_mask[word_index_to_mask] = mask_tokenizer.mask_token
+        tokenized_query_to_mask[word_index_to_mask] = bert_tokenizer.mask_token
         # print("tokenized_masked_query: ", tokenized_query_to_mask)
 
         masked_query_string = " ".join(tokenized_query_to_mask)
@@ -254,7 +255,7 @@ def impr_generate_similar_queries(input_query: str, max_n_query=20, verbose=Fals
     # For each masked_query_string generate the top 10 words that fit inside the [MASK] position
     best_tokens_list = list()
     for i in range(len(masked_query_strings_list)):
-        best_tokens = _get_bert_topk_predictions(mask_tokenizer, mask_model, masked_query_strings_list[i], original_masked_words[i], 10)
+        best_tokens = _get_bert_topk_predictions(bert_tokenizer, mask_model, masked_query_strings_list[i], original_masked_words[i], 10)
         best_tokens_list.append(best_tokens)
     if verbose:
         print(f"best_tokens_list: {best_tokens_list}")
@@ -262,8 +263,6 @@ def impr_generate_similar_queries(input_query: str, max_n_query=20, verbose=Fals
         print(f"pos_tags_masked_words: {pos_tags_masked_words}\n")
 
     # Use another BERT model and tokenizer to get the query embeddings
-    # emb_tokenizer = BertTokenizer.from_pretrained('../bert-base-uncased')
-    emb_tokenizer = BertTokenizerFast.from_pretrained('../bert-base-uncased')
     emb_model = BertModel.from_pretrained("../bert-base-uncased", output_hidden_states=True)
     emb_model.eval()
 
@@ -271,7 +270,7 @@ def impr_generate_similar_queries(input_query: str, max_n_query=20, verbose=Fals
     # Example: [['best_tok_mask_1_#1', ... , 'best_tok_mask_1_#n'], ... , ['best_tok_mask_K_#0', ... , 'best_tok_mask_K_#n']]
     best_new_tokens_list = list()
     for i in range(len(best_tokens_list)):
-        original_token_embedding = _get_bert_token_embedding(emb_tokenizer, emb_model, input_query, masked_words_indexes[i])
+        original_token_embedding = _get_bert_token_embedding(bert_tokenizer, emb_model, input_query, masked_words_indexes[i])
         best_tokens = best_tokens_list[i]
 
         # Collect inside the new_token_sim_dict dictionary all (new_token_for_masked_word_index, cosine_similarity_score) pairs
@@ -282,13 +281,10 @@ def impr_generate_similar_queries(input_query: str, max_n_query=20, verbose=Fals
             new_query_string = " ".join(new_tokenized_query)
             # print(new_query_string)
 
-            new_token_embedding = _get_bert_token_embedding(emb_tokenizer, emb_model, new_query_string, masked_words_indexes[i])
+            new_token_embedding = _get_bert_token_embedding(bert_tokenizer, emb_model, new_query_string, masked_words_indexes[i])
             # print(new_token_embedding.size())
 
             cos_sim = 1 - cosine(original_token_embedding, new_token_embedding)
-            # cos = CosineSimilarity(dim=0, eps=1e-8)
-            # cos_sim = cos(original_token_embedding, new_token_embedding)
-            # cos_sim_list.append(cos_sim)
             new_token_sim_dict[best_token] = cos_sim
 
             if verbose:
@@ -322,7 +318,7 @@ def impr_generate_similar_queries(input_query: str, max_n_query=20, verbose=Fals
             # => we need to extract new candidates, 20 per iteration (max 100), until at least one good token in the batch is found
             n_words_to_extract = 20                                 # We generate again the first 10, because now we consider low_sim_thresh
             while len(best_new_token_sim_dict) <= 1 and n_words_to_extract < 100:
-                best_tokens = _get_bert_topk_predictions(mask_tokenizer, mask_model, masked_query_strings_list[i], original_masked_words[i],
+                best_tokens = _get_bert_topk_predictions(bert_tokenizer, mask_model, masked_query_strings_list[i], original_masked_words[i],
                                                          n_words_to_extract)
                 if verbose:
                     print(f"\nLet's analyze the next set of 20 BERT candidate tokens:")
@@ -334,7 +330,7 @@ def impr_generate_similar_queries(input_query: str, max_n_query=20, verbose=Fals
                     new_query_string = " ".join(new_tokenized_query)
                     # print("new_query_string: ", new_query_string)
 
-                    new_token_embedding = _get_bert_token_embedding(emb_tokenizer, emb_model, new_query_string, masked_words_indexes[i])
+                    new_token_embedding = _get_bert_token_embedding(bert_tokenizer, emb_model, new_query_string, masked_words_indexes[i])
                     # print(new_token_embedding.size())
 
                     cos_sim = 1 - cosine(original_token_embedding, new_token_embedding)

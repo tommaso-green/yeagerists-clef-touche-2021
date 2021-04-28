@@ -561,7 +561,7 @@ def main():
         #         print(query)
         #     print()
 
-        all_new_queries = impr_generate_similar_queries(topic_list[5], max_n_query=20, verbose=True)
+        all_new_queries = impr_generate_similar_queries(topic_list[7], max_n_query=20, verbose=True)
         print(f"Number of new queries: {len(all_new_queries)}\n")
         for query in all_new_queries:
             print(query)
