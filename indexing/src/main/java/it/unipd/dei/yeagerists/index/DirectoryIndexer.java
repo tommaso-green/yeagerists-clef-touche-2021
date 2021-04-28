@@ -197,7 +197,7 @@ public class DirectoryIndexer {
                     }
 
                     if (argsIdSet.contains(arg.getId())) {
-                        log.warning(String.format("Found multiple arguments with the same id %s. The arg will be ignored ", arg.getId()));
+                        log.fine(String.format("Found multiple arguments with the same id %s. The arg will be ignored ", arg.getId()));
                         continue;
                     }
                     argsIdSet.add(arg.getId());
@@ -212,6 +212,11 @@ public class DirectoryIndexer {
 
                     // add the document text
                     doc.add(new BodyField(arg.getBody()));
+
+                    // add the title text - it can be empty
+                    if (!arg.getTitle().isEmpty()) {
+                        doc.add(new TitleField(arg.getTitle()));
+                    }
 
                     writer.addDocument(doc);
 

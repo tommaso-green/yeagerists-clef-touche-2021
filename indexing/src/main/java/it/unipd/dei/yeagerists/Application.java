@@ -11,7 +11,6 @@ import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Options;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.core.LowerCaseFilterFactory;
-import org.apache.lucene.analysis.core.StopFilterFactory;
 import org.apache.lucene.analysis.custom.CustomAnalyzer;
 import org.apache.lucene.analysis.standard.StandardTokenizerFactory;
 import org.apache.lucene.search.similarities.LMDirichletSimilarity;
@@ -53,7 +52,6 @@ public class Application {
         final Analyzer analyzer = CustomAnalyzer.builder()
                 .withTokenizer(StandardTokenizerFactory.class)
                 .addTokenFilter(LowerCaseFilterFactory.class)
-                .addTokenFilter(StopFilterFactory.class)
                 .build();
 
         final Similarity similarity = new LMDirichletSimilarity();
@@ -77,6 +75,7 @@ public class Application {
             final String indexPath = cli.getOptionValue("path");
             final String queriesPath = cli.getOptionValue("queries");
             final String resultsPath = cli.getOptionValue("results");
+            final Float titleBoost = Float.parseFloat(cli.getOptionValue("titleboost", "0"));
             final int maxDocsRetrieved = Integer.parseInt(cli.getOptionValue("max", "100"));
 
             // Try to get a writer to write the search results
@@ -96,7 +95,7 @@ public class Application {
                         String.format("Unable to open run file %s: %s.", outPath.toAbsolutePath(), e.getMessage()), e);
             }
 
-            final Searcher s = new Searcher(analyzer, similarity, indexPath, queriesPath, maxDocsRetrieved);
+            final Searcher s = new Searcher(analyzer, similarity, indexPath, queriesPath, titleBoost, maxDocsRetrieved);
 
             try {
                 List<ResultArgument> result = s.search();
@@ -121,6 +120,7 @@ public class Application {
         options.addOption("q", "queries", true, "Path to the queries to run (XML format)");
         options.addOption("r", "results", true, "Path to the file where results will be written");
         options.addOption("m", "max", true, "Maximum number of documents to retrieve");
+        options.addOption("tb", "titleboost", true, "Boost given to a title hit, must be > 0");
 
         CommandLineParser parser = new DefaultParser();
         return parser.parse(options, args);
