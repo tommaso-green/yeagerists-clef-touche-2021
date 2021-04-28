@@ -5,11 +5,23 @@ import xmltodict
 from argument_quality.model import *
 from query_expansion_python.query_exp_utils import *
 from datetime import datetime
+import math
 
 
 def expand_query(query: str):
     new_queries_list = impr_generate_similar_queries(query, verbose=False)
     return [query_id for query_id in range(len(new_queries_list))], new_queries_list
+
+
+def score(alpha, rel_score, q_score, type, **kwargs):
+    if type == 'sigmoid':
+        sigmoid = lambda x: 1 / (1 + math.exp(-kwargs['beta'] * x))
+        return (1 - alpha) * sigmoid(rel_score) + alpha * sigmoid(q_score)
+    if type == 'normalize':
+        return (1 - alpha) * rel_score/kwargs['max_rel'] + alpha * q_score/kwargs['max_q']
+    if type == 'hybrid':
+        sigmoid = lambda x: 1 / (1 + math.exp(-kwargs['beta'] * x))
+        return (1 - alpha) * rel_score / kwargs['max_rel'] + alpha * sigmoid(q_score)
 
 
 def write_queries_to_file(path: str, queries: [str], ids: [str]):
@@ -58,7 +70,7 @@ def main():
     parser.add_argument('-r', '--resultpath', type=str, default="data/res.txt")
     parser.add_argument('-t', '--topicpath', type=str,
                         default="datasets/touche2021topics/topics-task-1-only-titles.xml")
-    parser.add_argument('-c', '--ckpt', type=str, default="bert-base-uncased_best-epoch=04-val_r2=0.69.ckpt")
+    parser.add_argument('-c', '--ckpt', type=str, default="argument_quality/model_checkpoints/bert-base-uncased_best-epoch=04-val_r2=0.69.ckpt")
     parser.add_argument('-m', '--maxdocs', type=str, default="10")
     parser.add_argument('-qe', '--queryexp', action='store_true')
     parser.add_argument('-a', '--alpha', type=float, default=0.3)
@@ -68,7 +80,7 @@ def main():
     topic_list = read_topics(args.topicpath)
     print(f"Topic List size: {len(topic_list)}")
 
-    arg_quality_model = ArgQualityModel.load_from_checkpoint("argument_quality/model_checkpoints/" + args.ckpt)
+    arg_quality_model = ArgQualityModel.load_from_checkpoint(args.ckpt)
     arg_quality_model.eval()
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f"Device {device}")
@@ -116,8 +128,19 @@ def main():
         print('Time for Query Expansion: ', time_taken)
 
         print("\n" + "*" * 5 + "RERANKED LIST" + "*" * 5)
+        max_rel = max([d["score"] for d in documents])
+        max_q = max([args_with_score[i][1] for i in range(len(args_with_score))])
+        print(f"MAX RELEVANCE = {max_rel} \n MAX QUALITY = {max_q}")
+        type = 'normalize'
         for i, d in enumerate(documents):
-            d["total_score"] = (1 - args.alpha) * d["score"] + args.alpha * args_with_score[i][1]
+            if type == 'sigmoid':
+                d["total_score"] = score(args.alpha, d["score"], args_with_score[i][1], type='sigmoid', beta=0.2)
+            if type == 'normalize':
+                d["total_score"] = score(args.alpha, d["score"], args_with_score[i][1], type='normalize',
+                                         max_rel=max_rel, max_q=max_q)
+            if type == 'hybrid':
+                d["total_score"] = score(args.alpha, d["score"], args_with_score[i][1], type='hybrid',
+                                         max_rel=max_rel, beta=0.2)
         reranked_docs = sorted(documents, key=lambda d: (int(d["queryId"]), -d["total_score"]))
         for i, d in enumerate(reranked_docs):
             print("\n\n")

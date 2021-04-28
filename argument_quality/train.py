@@ -19,6 +19,8 @@ def main():
     parser.add_argument('--train_size', type=float, default=0.8)
     parser.add_argument('--val_size', type=float, default=0.1)
     parser.add_argument('--test_size', type=float, default=0.1)
+    parser.add_argument('--dropout_prob', type=float, default=0.0)
+    parser.add_argument('-l', '--log', type=bool, default=True)
     parser.add_argument('-m', '--model_name', type=str, default='bert-base-uncased')
 
     parser = ArgQualityDataset.add_specific_args(parser)
@@ -34,11 +36,11 @@ def main():
     dm.setup()
 
     arg_quality_model = ArgQualityModel(model_name=args.model_name, learning_rate=args.learning_rate,
-                                        weight_decay=args.weight_decay)
+                                        weight_decay=args.weight_decay, dropout_prob=args.dropout_prob)
 
     if args.hyperparameter_search:
         wandb.init()
-    else:
+    if args.log:
         wandb.init(project="ArgumentQuality", name=args.model_name)
 
     if not args.hyperparameter_search:
@@ -53,13 +55,19 @@ def main():
         my_callbacks = []
         ckpt_flag = False
 
-    wandb.config.update(args)
-    wandb_logger = WandbLogger()
+    if args.log:
+        wandb.config.update(args)
+        logger = WandbLogger()
+    else:
+        logger = None
+
     trainer = pl.Trainer(gpus=args.gpus, max_epochs=args.num_epochs, val_check_interval=0.25,
-                         deterministic=True, logger=wandb_logger, callbacks=my_callbacks, 
+                         deterministic=True, logger=logger, callbacks=my_callbacks,
                          checkpoint_callback=ckpt_flag)
     trainer.fit(arg_quality_model, datamodule=dm)
-    return wandb.run.url
+
+    if args.log:
+        return wandb.run.url
 
 
 if __name__ == "__main__":
