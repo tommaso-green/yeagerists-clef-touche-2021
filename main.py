@@ -125,31 +125,40 @@ def main():
             args_with_score += arg_quality_model(arg)
         end = datetime.now()
         time_taken = end - start
-        print('Time for Query Expansion: ', time_taken)
+        print('Time for Quality Reranking: ', time_taken)
+        for i, d in enumerate(documents):
+            d['quality'] = float(args_with_score[i][1])
 
         print("\n" + "*" * 5 + "RERANKED LIST" + "*" * 5)
-        max_rel = max([d["score"] for d in documents])
-        max_q = max([args_with_score[i][1] for i in range(len(args_with_score))])
-        print(f"MAX RELEVANCE = {max_rel} \n MAX QUALITY = {max_q}")
         type = 'normalize'
-        for i, d in enumerate(documents):
+        if type in ['normalize', 'hybrid']:
+            max_rel = {}
+            max_q = {}
+            query_ids = set([d['queryId'] for d in documents])
+            for query in query_ids:
+                max_rel[query] = max([d['score'] for d in documents if d['queryId'] == query])
+                max_q[query] = max([d['quality'] for d in documents if d['queryId'] == query])
+
+        print(f"MAX RELEVANCE = {max_rel} \n MAX QUALITY = {max_q}")
+
+        for d in documents:
             if type == 'sigmoid':
-                d["total_score"] = score(args.alpha, d["score"], args_with_score[i][1], type='sigmoid', beta=0.2)
+                d["total_score"] = score(args.alpha, d["score"], d["quality"], type='sigmoid', beta=0.2)
             if type == 'normalize':
-                d["total_score"] = score(args.alpha, d["score"], args_with_score[i][1], type='normalize',
-                                         max_rel=max_rel, max_q=max_q)
+                d["total_score"] = score(args.alpha, d["score"], d["quality"], type='normalize',
+                                         max_rel=max_rel[d['queryId']], max_q=max_q[d['queryId']])
             if type == 'hybrid':
-                d["total_score"] = score(args.alpha, d["score"], args_with_score[i][1], type='hybrid',
-                                         max_rel=max_rel, beta=0.2)
+                d["total_score"] = score(args.alpha, d["score"], d["quality"], type='hybrid',
+                                         max_rel=max_rel[d['queryId']], beta=0.2)
         reranked_docs = sorted(documents, key=lambda d: (int(d["queryId"]), -d["total_score"]))
-        for i, d in enumerate(reranked_docs):
+        for d in reranked_docs:
             print("\n\n")
             print("Query id: %s" % d["queryId"])
             print("Doc id: %s" % d["id"])
             print("Doc body: %s" % d["body"])
             print("Doc stance: %s" % d["stance"])
             print("Doc score: %s" % d["score"])
-            print("Doc quality: %s" % args_with_score[i][1])
+            print("Doc quality: %s" % d["quality"])
             print("Doc total score: %s" % d["total_score"])
 
     else:
