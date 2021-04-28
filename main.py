@@ -126,7 +126,7 @@ def expand_queries(queries: [str]):
 def get_quality_score(model, documents, args):
     # todo check if there's any improvement by dividing arguments in small batches
     for d in documents:
-        d['quality'] = 0.1 #model(d['body'])
+        d['quality'] = model(d['body'])
 
     if args.type in ['normalize', 'hybrid']:
         max_rel = {}
@@ -139,14 +139,14 @@ def get_quality_score(model, documents, args):
     print(f"MAX RELEVANCE = {max_rel} \n MAX QUALITY = {max_q}")
 
     for d in documents:
-        if type == 'sigmoid':
+        if args.type == 'sigmoid':
             d["total_score"] = score(args.alpha, d["score"], d["quality"], type='sigmoid', beta=args.beta)
-        if type == 'normalize':
+        if args.type == 'normalize':
             d["total_score"] = score(args.alpha, d["score"], d["quality"], type='normalize',
-                                     max_rel=max_rel, max_q=max_q)
-        if type == 'hybrid':
+                                     max_rel=max_rel[d["queryId"]], max_q=max_q[d["queryId"]])
+        if args.type == 'hybrid':
             d["total_score"] = score(args.alpha, d["score"], d["quality"], type='hybrid',
-                                     max_rel=max_rel, beta=args.beta)
+                                     max_rel=max_rel[d["queryId"]], beta=args.beta)
 
     return documents
 
