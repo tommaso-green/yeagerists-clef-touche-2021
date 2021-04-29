@@ -41,7 +41,7 @@ def main(args=None):
         start = datetime.now()
         print('-->Starting Query Expansion')
 
-        new_queries_lists = expand_queries(queries, args.queryexpmodel)
+        new_queries_lists = expand_queries(queries)
 
         # create a flat list of queries
         new_queries = []
@@ -71,9 +71,20 @@ def main(args=None):
     if args.alpha > 0:
         start = datetime.now()
 
-        print(f'Running quality re-ranking for {len(documents)} arguments')
-        # Add 'total_score' to each doc considering predicted quality
-        documents = get_quality_score(arg_quality_model, documents, args)
+        print(f'Running quality re-ranking')
+        # Add 'total_score' to the top arg.nrerank documents for each topic
+
+        # Group by query ID
+        docs_per_query_id = dict()
+        # Group documents by query id
+        for doc in documents:
+            docs_of_query = docs_per_query_id.get(doc["queryId"])
+            if not docs_of_query:
+                docs_of_query = []
+            docs_of_query.append(doc)
+            docs_per_query_id[doc["queryId"]] = docs_of_query
+
+        get_quality_score(arg_quality_model, documents, args)
         re_ranked_docs = sorted(documents, key=lambda doc: (int(doc["queryId"]), -doc["total_score"]))
 
         print('Time for quality re-ranking: ', datetime.now() - start)
@@ -232,6 +243,8 @@ def parse_args(args):
     parser.add_argument('-n', '--name', type=str, default="dev_run")
     parser.add_argument('--type', type=str, default="normalize")
     parser.add_argument('--beta', type=float, default=0.2)
+    parser.add_argument('--nrerank', type=int, default=5)
+
     return parser.parse_args(args)
 
 
