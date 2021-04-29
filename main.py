@@ -17,10 +17,13 @@ def main(args=None):
 
     dir_path = f"./data/experiment/{args.name}"
     try:
+
         os.makedirs(dir_path)
     except OSError:
-        print(f"Error creating results directory {dir_path}, if the dir already exists change run name")
-        return
+        print(f"Error creating results directory {dir_path}: directory already exists")
+        if len(os.listdir(dir_path)) != 0:
+            print("Directory already contains data: delete it or change run name")
+            return
 
     topic_list = read_topics(args.topicpath)
     print(f"Topic List size: {len(topic_list)}")
@@ -34,12 +37,22 @@ def main(args=None):
 
     ids = [x[0] for x in topic_list]
     queries = [x[1] for x in topic_list]
-    if args.queryexp:
+    if args.queryexp == "yes":
         start = datetime.now()
         print('-->Starting Query Expansion')
 
-        new_queries_list = expand_queries(queries)
-        write_queries_to_file(args.querypath, new_queries_list, ids)
+        new_queries_lists = expand_queries(queries, args.queryexpmodel)
+
+        # create a flat list of queries
+        new_queries = []
+        new_ids = []
+        for i in range(len(new_queries_lists)):
+            for q in new_queries_lists[i]:
+                new_queries.append(q)
+                new_ids.append(ids[i])  # replicate the original id for each expanded query
+        queries = new_queries
+        ids = new_ids
+        write_queries_to_file(args.querypath, queries, ids)
 
         print('Time taken for Query Expansion: ', datetime.now() - start)
     else:
@@ -52,6 +65,8 @@ def main(args=None):
     # Each result document contains: queryId, id, body, stance, score
     documents = read_results(args.resultpath)
     print(f"--->Number of documents retrieved from index: {len(documents)}")
+    documents = remove_duplicate_documents(documents)
+    print(f"--->Number of documents retrieved without duplicates: {len(documents)}")
 
     if args.alpha > 0:
         start = datetime.now()
@@ -69,6 +84,29 @@ def main(args=None):
         re_ranked_docs = sorted(documents, key=lambda doc: (int(doc["queryId"]), -doc["total_score"]))
 
     save_run(documents=re_ranked_docs, directory=dir_path, args=args)
+
+
+def remove_duplicate_documents(documents):
+    docs_per_query_id = dict()
+    # Group documents by query id
+    for doc in documents:
+        docs_of_query = docs_per_query_id.get(doc["queryId"])
+        if not docs_of_query:
+            docs_of_query = []
+        docs_of_query.append(doc)
+        docs_per_query_id[doc["queryId"]] = docs_of_query
+    # Remove duplicates
+    res = []
+    for qid, docs in docs_per_query_id.items():
+        filtered_docs = []
+        ids_set = set()
+        for document in docs:
+            if document["id"] not in ids_set:
+                ids_set.add(document["id"])
+                filtered_docs.append(document)
+        res.extend(filtered_docs)
+        print(f"Query {qid} has {len(filtered_docs)} documents")
+    return res
 
 
 def save_run(documents, directory, args):
@@ -91,6 +129,7 @@ def save_run(documents, directory, args):
 
     # Save nDCG@5 for quick read
     nDCG = float(subprocess.check_output("make -s evaluate | grep ndcg_cut_5 | head -1", shell=True).split()[2])
+
     with open(directory + "/ndcg5_" + str(nDCG), "w") as f:
         f.write(f"nDGC at 5: {nDCG}")
 
@@ -139,32 +178,25 @@ def get_quality_score(model, documents, args):
     return documents
 
 
-def write_queries_to_file(path: str, new_queries_list: [[str]], ids: [str]):
+def write_queries_to_file(path: str, queries: [str], ids: [str]):
+    assert len(queries) == len(ids)
     with open(path, "w+") as f:
         f.write("<topics>")
 
-        # For each list of (max) 10 new queries associated to a topic
-        for i in range(len(new_queries_list)):
-            new_queries = new_queries_list[i]
+        for i in range(len(queries)):
+            f.write("<topic>")
 
-            # For each single query of these lists of (max) 10 new queries
-            for j in range(len(new_queries)):
-                new_query = new_queries[j]
+            f.write("<number>")
+            f.write(str(ids[i]))
+            f.write("</number>")
 
-                f.write("<topic>")
+            f.write("<title>")
+            f.write(queries[i])
+            f.write("</title>")
 
-                f.write("<number>")
-                f.write(str(ids[i]))
-                f.write("</number>")
-
-                f.write("<title>")
-                f.write(str(new_query))
-                f.write("</title>")
-
-                f.write("</topic>")
+            f.write("</topic>")
 
         f.write("</topics>")
-    f.close()
 
 
 def read_results(res_path: str):
@@ -194,7 +226,7 @@ def parse_args(args):
     parser.add_argument('-c', '--ckpt', type=str,
                         default="argument_quality/model_checkpoints/bert-base-uncased_best-epoch=04-val_r2=0.69.ckpt")
     parser.add_argument('-m', '--maxdocs', type=str, default="10")
-    parser.add_argument('-qe', '--queryexp', action='store_true')
+    parser.add_argument('-qe', '--queryexp', type=str, default="yes")
     parser.add_argument('-a', '--alpha', type=float, default=0.3)
     parser.add_argument('-tb', '--titleboost', type=float, default=0)
     parser.add_argument('-n', '--name', type=str, default="dev_run")

@@ -430,7 +430,12 @@ def generate_similar_queries_all_topics(input_query_list, max_n_query=10, verbos
             print(f"Refined tokenized_query: {tokenized_query}")
 
         # Get the indexes of just some specific POS of the query (es. just nouns and adjectives), which will be the tokens we actually mask
-        pos_tags_wn = nltk.pos_tag(tokenized_query)
+        try:
+            pos_tags_wn = nltk.pos_tag(tokenized_query)
+        except LookupError:  # Download resource if it's not already present
+            nltk.download('averaged_perceptron_tagger')
+            pos_tags_wn = nltk.pos_tag(tokenized_query)
+
         if verbose:
             print(f"POS tagging result: {pos_tags_wn}\n")
         masked_words_indexes = [i for i in range(len(pos_tags_wn)) if _is_nltk_pos_tag_to_mask(pos_tags_wn[i][1])]

@@ -22,7 +22,7 @@ index:
 	java -jar indexing/target/indexing-1.0-SNAPSHOT-jar-with-dependencies.jar  --index -dataset ${DATASET_PATH} -output ${INDEX_PATH}
 
 run:
-	python main.py -m ${MAX_RESULTS} --ckpt ${MODEL} --topicpath ${TOPICS} --alpha ${ALPHA} --name ${RUN_NAME} --titleboost ${TITLE_BOOST} --type ${TYPE} --beta ${BETA}
+	python main.py -m ${MAX_RESULTS} --ckpt ${MODEL} --topicpath ${TOPICS} --alpha ${ALPHA} --name ${RUN_NAME} --titleboost ${TITLE_BOOST} --type ${TYPE} --beta ${BETA} --queryexp ${QUERY_EXP}
 
 evaluate:
 	./trec_eval-9.0.7/trec_eval -m all_trec ${JUDGMENTS} ./data/experiment/${RUN_NAME}/run.txt

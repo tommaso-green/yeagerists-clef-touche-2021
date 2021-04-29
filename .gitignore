@@ -3,6 +3,7 @@ data
 .env
 argument_quality/model_checkpoints/*
 run.txt
+bert-base-uncased
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
