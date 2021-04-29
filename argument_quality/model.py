@@ -8,10 +8,11 @@ from torchmetrics import R2Score
 
 class ArgQualityModel(pl.LightningModule):
 
-    def __init__(self, model_name, learning_rate, weight_decay, dropout_prob):
+    def __init__(self, model_name, learning_rate, weight_decay, dropout_prob, lr_encoder=0.0):
         super().__init__()
 
         self.learning_rate = learning_rate
+        self.lr_encoder = lr_encoder
         self.weight_decay = weight_decay
         self.dropout_prob = dropout_prob
         self.dropout = nn.AlphaDropout(self.dropout_prob)
@@ -30,8 +31,9 @@ class ArgQualityModel(pl.LightningModule):
         self.val_r2score = R2Score()
         self.test_r2score = R2Score()
 
-        for param in self.encoder.base_model.parameters():
-            param.requires_grad = False
+        if self.lr_encoder == 0.0:
+            for param in self.encoder.base_model.parameters():
+                param.requires_grad = False
 
         self.save_hyperparameters()
 
@@ -46,7 +48,7 @@ class ArgQualityModel(pl.LightningModule):
         arg_to_score = [[x, batch_scores[idx][0].item()] for idx, x in enumerate(textual_args)]
         return arg_to_score
 
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch, batch_idx, optimizer_idx):
         batch_input, batch_targets = batch
         encoder_output = self.encoder(**batch_input, output_hidden_states=True)  # BERT pass
         cls_emb = encoder_output.last_hidden_state[:, 0, :]
@@ -91,12 +93,18 @@ class ArgQualityModel(pl.LightningModule):
             self.log('test_r2', test_r2, on_step=False, on_epoch=True, prog_bar=True)
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
-        return optimizer
+        if self.lr_encoder == 0.0:
+            optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
+            return optimizer
+        else:
+            enc_optimizer = torch.optim.Adam(self.encoder.parameters(), lr=self.lr_encoder, weight_decay=self.weight_decay)
+            optimizer = torch.optim.Adam(self.ffn.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
+            return [enc_optimizer, optimizer]
 
     @staticmethod
     def add_specific_args(parent_parser):
         parser = parent_parser.add_argument_group("ArgQualityModel")
         parser.add_argument('-lr', '--learning_rate', type=float, default=1e-4)
         parser.add_argument('-w', '--weight_decay', type=float, default=1e-5)
+        parser.add_argument('--lr_encoder', type=float, default=0.0)
         return parent_parser

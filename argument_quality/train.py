@@ -36,7 +36,8 @@ def main():
     dm.setup()
 
     arg_quality_model = ArgQualityModel(model_name=args.model_name, learning_rate=args.learning_rate,
-                                        weight_decay=args.weight_decay, dropout_prob=args.dropout_prob)
+                                        weight_decay=args.weight_decay, dropout_prob=args.dropout_prob,
+                                        lr_encoder=args.lr_encoder)
 
     if args.hyperparameter_search:
         wandb.init()
