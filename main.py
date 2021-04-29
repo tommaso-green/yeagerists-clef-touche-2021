@@ -84,8 +84,13 @@ def main(args=None):
             docs_of_query.append(doc)
             docs_per_query_id[doc["queryId"]] = docs_of_query
 
-        get_quality_score(arg_quality_model, documents, args)
-        re_ranked_docs = sorted(documents, key=lambda doc: (int(doc["queryId"]), -doc["total_score"]))
+        re_ranked_docs = []
+        for qid in docs_per_query_id:
+            docs_per_query_id[qid].sort(key=lambda doc: doc["score"], reverse=True)
+            top_reranked = get_quality_score(arg_quality_model, docs_per_query_id[qid][:args.nrerank], args)
+            re_ranked_docs += top_reranked
+
+        re_ranked_docs.sort(key=lambda doc: (int(doc["queryId"]), -doc["total_score"]))
 
         print('Time for quality re-ranking: ', datetime.now() - start)
     else:
@@ -164,7 +169,7 @@ def expand_queries(queries: [str]):
 def get_quality_score(model, documents, args):
     # todo check if there's any improvement by dividing arguments in small batches
     for d in documents:
-        d['quality'] = model(d['body'])
+        d['quality'] = model(d['body'])[0][1]
 
     if args.type in ['normalize', 'hybrid']:
         max_rel = {}
