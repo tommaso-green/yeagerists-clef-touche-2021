@@ -1,6 +1,6 @@
 # README #
 
-##Report
+## Report
 
 The PDF report for HW1 is stored in HW1-Report.
 
