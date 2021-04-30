@@ -144,10 +144,11 @@ def save_run(documents, directory, args):
         f.write(str(args.__dict__))
 
     # Save nDCG@5 for quick read
-    nDCG = float(subprocess.check_output("make -s evaluate | grep ndcg_cut_5 | head -1", shell=True).split()[2])
+    if args.judgements != "none":
+        nDCG = float(subprocess.check_output("make -s evaluate | grep ndcg_cut_5 | head -1", shell=True).split()[2])
 
-    with open(directory + "/ndcg5_" + str(nDCG), "w") as f:
-        f.write(f"nDGC at 5: {nDCG}")
+        with open(directory + "/ndcg5_" + str(nDCG), "w") as f:
+            f.write(f"nDGC at 5: {nDCG}")
 
 
 def score(alpha, rel_score, q_score, type, **kwargs):
@@ -248,6 +249,7 @@ def parse_args(args):
     parser.add_argument('--type', type=str, default="normalize")
     parser.add_argument('--beta', type=float, default=0.2)
     parser.add_argument('--nrerank', type=int, default=5)
+    parser.add_argument('--judgements', type=str, default="none")
 
     return parser.parse_args(args)
 
