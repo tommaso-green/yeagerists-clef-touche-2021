@@ -6,7 +6,7 @@ import sys
 import torch.cuda
 import xmltodict
 from argument_quality.model import *
-from query_expansion_python.query_exp_utils import *
+from query_expansion_python.query_expansion_utils import *
 from datetime import datetime
 import math
 
@@ -162,7 +162,7 @@ def score(alpha, rel_score, q_score, type, **kwargs):
 
 
 def expand_queries(queries: [str]):
-    new_queries_list = generate_similar_queries_all_topics(queries, max_n_query=10, verbose=False)
+    new_queries_list = expand_queries_list(queries, max_n_query=10, verbose=False)
     return new_queries_list
 
 
