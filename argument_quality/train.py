@@ -6,10 +6,7 @@ from knockknock import telegram_sender
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
-CHAT_ID: int = 125901512
 
-
-# @telegram_sender(token="1717011473:AAFVMLD5p_1SzCFEiPZ6Ahhr2U35ZidHGc0", chat_id=CHAT_ID)
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpus', type=int, default=1)
@@ -47,10 +44,10 @@ def main():
         my_callbacks = [ModelCheckpoint(
             monitor='val_r2',
             dirpath='model_checkpoints/',
-            filename=args.model_name+'_best-{epoch:02d}-{val_r2:.2f}',
+            filename=args.model_name + '_best-{epoch:02d}-{val_r2:.2f}',
             mode='max', save_top_k=2),
             EarlyStopping(monitor='val_r2', mode='max', patience=4)]
-        ckpt_flag = True #checkpoint_callback=False
+        ckpt_flag = True  # checkpoint_callback=False
     else:
         my_callbacks = []
         ckpt_flag = False
