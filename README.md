@@ -1,5 +1,9 @@
 # README #
 
+##Report
+
+The PDF report for HW1 is stored in HW1-Report.
+
 ## Requirements
 - Make
 - The Args.me corpus: https://zenodo.org/record/3734893#.YIV1SYNfi6k
