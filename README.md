@@ -40,3 +40,5 @@ If you are using argument quality re-ranking (i.e. if variable `ALPHA` is >0 in 
 
 ### Evaluate
 If you have a .qrels judgments file (read from variable `JUDGMENTS` in `.env`), run `make evaluate` to evaluate the performance of the program. 
+
+The command uses the `.env` variable `RUN_NAME` to pick the run-file contained in the folder data/experiment (i.e. the chosen run-file will be `data/experiment/${RUN_NAME}/run.txt`) and run trec-eval and output the score.  
