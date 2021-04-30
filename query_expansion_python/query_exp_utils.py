@@ -27,7 +27,7 @@ def _convert_nltk_to_wordnet_tag(pos_tag):
 def _is_nltk_pos_tag_to_mask(pos_tag):
     if pos_tag.startswith("N"):             # Corresponds to a wn.NOUN
         return True
-    elif pos_tag.startswith("VBN"):
+    elif pos_tag.startswith("VBN"):         # Verbs at past participle
         return True
     elif pos_tag.startswith("J"):           # Corresponds to a wn.ADJ
         return True

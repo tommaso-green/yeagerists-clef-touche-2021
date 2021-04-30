@@ -15,6 +15,7 @@ from textblob import TextBlob
 from transformers import GPT2Tokenizer, GPT2LMHeadModel, pipeline, BeamSearchScorer, AutoModelForMaskedLM, AutoTokenizer, BertTokenizer, BertModel
 
 from query_exp_utils import *
+from query_expansion_utils import *
 
 
 def write_queries_to_file(path: str, new_queries_list: [[str]], ids: [str]):
@@ -614,7 +615,7 @@ def main():
 
         start = time.time()
 
-        all_new_queries_list = generate_similar_queries_all_topics(topic_list, max_n_query=20, verbose=False)
+        all_new_queries_list = expand_queries_list(topic_list, max_n_query=20, verbose=False)
 
         for queries in all_new_queries_list:
             print(queries)
