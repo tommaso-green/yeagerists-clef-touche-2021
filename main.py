@@ -178,8 +178,7 @@ def get_quality_score(model, documents, args):
         for query in query_ids:
             max_rel[query] = max([d['score'] for d in documents if d['queryId'] == query])
             max_q[query] = max([d['quality'] for d in documents if d['queryId'] == query])
-
-    print(f"MAX RELEVANCE = {max_rel} \n MAX QUALITY = {max_q}")
+        print(f"MAX RELEVANCE = {max_rel} \n MAX QUALITY = {max_q}")
 
     for d in documents:
         if args.type == 'sigmoid':
