@@ -9,6 +9,7 @@ from argument_quality.model import *
 from query_expansion_python.query_expansion_utils import *
 from datetime import datetime
 import math
+import wandb
 
 
 def main(args=None):
@@ -145,7 +146,13 @@ def save_run(documents, directory, args):
 
     # Save nDCG@5 for quick read
     if args.judgements != "none":
-        nDCG = float(subprocess.check_output("make -s evaluate | grep ndcg_cut_5 | head -1", shell=True).split()[2])
+        if args.test == 'no':
+            nDCG = float(subprocess.check_output("make -s evaluate | grep ndcg_cut_5 | head -1", shell=True).split()[2])
+        else:
+            nDCG = float(subprocess.check_output(
+                f"./trec_eval-9.0.7/trec_eval -m all_trec {args.judgements} ./data/experiment/{wandb.run.id}/run.txt | grep ndcg_cut_5 | head -1",
+                shell=True).split()[2])
+            wandb.log({"nDCG@5": nDCG})
 
         with open(directory + "/ndcg5_" + str(nDCG), "w") as f:
             f.write(f"nDGC at 5: {nDCG}")
@@ -250,8 +257,18 @@ def parse_args(args):
     parser.add_argument('--beta', type=float, default=0.2)
     parser.add_argument('--nrerank', type=int, default=5)
     parser.add_argument('--judgements', type=str, default="none")
+    parser.add_argument('--test', type=str, default="no")
 
-    return parser.parse_args(args)
+    arguments = parser.parse_args(args)
+    if arguments.test == "yes":
+        print("***INITIALISING WandB!")
+        wandb.init(entity="yeagerists", project="ArgumentRetrieval_Tests")
+        arguments.name = wandb.run.id
+        rel_args = {key: value for (key, value) in arguments.__dict__.items() if
+                    key not in ['topicpath', 'indexpath', 'resultpath', 'querypath', 'test', 'judgements', 'name']}
+        wandb.config.update(rel_args)
+
+    return arguments
 
 
 if __name__ == "__main__":
