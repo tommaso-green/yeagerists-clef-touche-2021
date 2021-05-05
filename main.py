@@ -25,8 +25,14 @@ def main(args=None):
         if len(os.listdir(dir_path)) != 0:
             print("Directory already contains data: delete it or change run name")
             return
-
-    topic_list = read_topics(args.topicpath)
+    
+    if args.queryexp == "yes":
+        print("Performing query expansion by reading expanded queries file")
+        topic_list = read_topics("./touche/expanded_queries.xml")
+        args.queryexp = "no"
+    else:
+        topic_list = read_topics(args.topicpath)
+        
     print(f"Topic List size: {len(topic_list)}")
 
     if args.alpha != 0:
