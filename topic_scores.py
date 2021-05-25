@@ -20,8 +20,7 @@ def main():
     folder_ids = os.listdir(args.directory)
     runs = [run for run in folder_ids if run in run_ids]
     run_ndcg_list = []
-    limit = 150
-    for i, run in enumerate(runs[limit:]):
+    for i, run in enumerate(runs):
         run_dir = "/".join([args.directory, run])
         if os.path.exists(f"{run_dir}/ndcg_topic.txt"):
             os.remove(f"{run_dir}/ndcg_topic.txt")
@@ -58,16 +57,16 @@ def main():
         f.writelines(ndcg_cut_5_lines)
         f.close()
 
-        wandb.init(project="ArgumentRetrieval_Tests", entity="yeagerists", id=run, resume=True)
-        wandb.save(f"{run_dir}/ndcg_cut_5.txt")
-        wandb.log({"nDCG@5_corr": ndcg_total})
+        # wandb.init(project="ArgumentRetrieval_Tests", entity="yeagerists", id=run, resume=True)
+        # wandb.save(f"{run_dir}/ndcg_cut_5.txt")
+        # wandb.log({"nDCG@5_corr": ndcg_total})
 
-        data = [[label, val] for (label, val) in ndcg_per_topic.items()]
-        data.sort(key=lambda x: x[0])
-        table = wandb.Table(data=data, columns=["topic", "nDCG@5"])
-        fields = {"value": "nDCG@5", "label": "topic", "title": "nDCG@5 per topic"}
-        chart = wandb.plot_table(vega_spec_name="yeagerists/vertical_bar_chart", data_table=table, fields=fields)
-        wandb.log({"nDCG@5 per Topic Table": chart})
+        # data = [[label, val] for (label, val) in ndcg_per_topic.items()]
+        # data.sort(key=lambda x: x[0])
+        # table = wandb.Table(data=data, columns=["topic", "nDCG@5"])
+        # fields = {"value": "nDCG@5", "label": "topic", "title": "nDCG@5 per topic"}
+        # chart = wandb.plot_table(vega_spec_name="yeagerists/vertical_bar_chart", data_table=table, fields=fields)
+        # wandb.log({"nDCG@5 per Topic Table": chart})
 
         # data = [[x] for x in ndcg_per_topic.values()]
         # data.sort(key=lambda x: x[0])
@@ -78,17 +77,17 @@ def main():
         # hist = numpy.histogram(data)
         # wandb.log({"histo_test": wandb.Histogram(np_histogram=hist)})
 
-        wandb.finish()
+        #wandb.finish()
         print(f"Processed run {run} ({i+1}/{len(runs)})")
 
-    # topic_list = sorted(run_ndcg_list[0].keys())
-    # with open('run_csv/summary_nDCG_topic.csv', 'w') as csvfile:
-    #     csvfile.write(",".join(runs) + "\n")
-    #     for topic in topic_list:
-    #         value_list = [str(x[topic]) for x in run_ndcg_list]
-    #         line = ",".join(value_list) + "\n"
-    #         csvfile.write(line)
-    #     csvfile.close()
+    topic_list = sorted(run_ndcg_list[0].keys())
+    with open('run_csv/summary_nDCG_topic.csv', 'w') as csvfile:
+        csvfile.write(",".join(runs) + "\n")
+        for topic in topic_list:
+            value_list = [str(x[topic]) for x in run_ndcg_list]
+            line = ",".join(value_list) + "\n"
+            csvfile.write(line)
+        csvfile.close()
     # wandb.init(project="ArgumentRetrieval_Tests", entity="yeagerists", name="overall_results_csv")  # , id=run)
     # wandb.save(f"run_csv/summary_nDCG_topic.csv")
     # wandb.finish()
