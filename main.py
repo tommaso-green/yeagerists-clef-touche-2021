@@ -25,13 +25,8 @@ def main(args=None):
         if len(os.listdir(dir_path)) != 0:
             print("Directory already contains data: delete it or change run name")
             return
-    
-    if args.queryexp == "yes":
-        print("Performing query expansion by reading expanded queries file")
-        topic_list = read_topics("./touche/expanded_queries.xml")
-        args.queryexp = "no"
-    else:
-        topic_list = read_topics(args.topicpath)
+
+    topic_list = read_topics(args.topicpath)
         
     print(f"Topic List size: {len(topic_list)}")
 
@@ -263,12 +258,12 @@ def parse_args(args):
     parser.add_argument('--beta', type=float, default=0.2)
     parser.add_argument('--nrerank', type=int, default=5)
     parser.add_argument('--judgements', type=str, default="none")
-    parser.add_argument('--test', type=str, default="no")
+    parser.add_argument('--test', type=str, default="yes")
 
     arguments = parser.parse_args(args)
     if arguments.test == "yes":
         print("***INITIALISING WandB!")
-        wandb.init(entity="yeagerists", project="ArgumentRetrieval_Tests")
+        wandb.init(entity="yeagerists", project="ArgumentRetrieval_Tests", name=arguments.name)
         arguments.name = wandb.run.id
         rel_args = {key: value for (key, value) in arguments.__dict__.items() if
                     key not in ['topicpath', 'indexpath', 'resultpath', 'querypath', 'test', 'judgements', 'name']}
