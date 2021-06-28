@@ -155,7 +155,7 @@ def save_run(documents, directory, args):
                 shell=True).split()[2])
             wandb.log({"nDCG@5": nDCG})
 
-        with open(directory + "/ndcg5_" + str(nDCG), "w") as f:
+        with open(directory + "/ndcg5_2021_" + str(nDCG), "w") as f:
             f.write(f"nDGC at 5: {nDCG}")
 
 
@@ -258,7 +258,7 @@ def parse_args(args):
     parser.add_argument('--beta', type=float, default=0.2)
     parser.add_argument('--nrerank', type=int, default=5)
     parser.add_argument('--judgements', type=str, default="none")
-    parser.add_argument('--test', type=str, default="yes")
+    parser.add_argument('--test', type=str, default="no")
 
     arguments = parser.parse_args(args)
     if arguments.test == "yes":
