@@ -3,7 +3,7 @@
 ## Requirements
 - Make
 - The Args.me corpus: https://zenodo.org/record/3734893#.YIV1SYNfi6k
-- The Argument Quality models: https://github.com/tommaso-green/yeagerists-clef-touche-2021/releases/download/v1.0.0/quality_models.zip
+- The Argument Quality models, available from the release
 
 ## Usage
 
