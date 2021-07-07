@@ -82,14 +82,14 @@ def expand_queries_list(input_query_list, max_n_query=10, verbose=False):
         return 1
 
     # Load just one tokenizer for the whole task
-    bert_tokenizer = BertTokenizerFast.from_pretrained('../bert-base-uncased')
+    bert_tokenizer = BertTokenizerFast.from_pretrained('bert-base-uncased')
 
     # Load a BERT model to get the list of candidate words to replace the masked ones
-    mask_model = AutoModelForMaskedLM.from_pretrained("../bert-base-uncased")
+    mask_model = AutoModelForMaskedLM.from_pretrained("bert-base-uncased")
     mask_model.eval()
 
     # Load another BERT model to compute the query embeddings
-    emb_model = BertModel.from_pretrained("../bert-base-uncased", output_hidden_states=True)
+    emb_model = BertModel.from_pretrained("bert-base-uncased", output_hidden_states=True)
     emb_model.eval()
 
     new_queries_strings_list = list()

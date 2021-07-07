@@ -1,14 +1,9 @@
 # README #
 
-## Report
-
-The PDF report for HW1 is stored in HW1-Report.
-
 ## Requirements
 - Make
 - The Args.me corpus: https://zenodo.org/record/3734893#.YIV1SYNfi6k
-- The Argument Quality models: https://drive.google.com/drive/folders/1x_oMuYorWAQ3JGBSCJKmFKewP_3YfuXW
-- The BERT model for query expansion (must be placed in the root of the project): https://drive.google.com/file/d/1ofTdZggWZB14oLZ-y3VelnMLmdJrBI8b/view?usp=sharing
+- The Argument Quality models: https://github.com/tommaso-green/yeagerists-clef-touche-2021/releases/download/v1.0.0/quality_models.zip
 
 ## Usage
 
@@ -25,7 +20,7 @@ For more information about the `.env` file variables, check the comments availab
 - (Optional) Run `virtualenv venv` (or `python3 -m venv venv`) to create a virtual environment for the requirements 
     - Run `. venv/bin/activate` to activate the virtual env
     - Once you are done, run `deactivate` to close the virtual env
-    - Note: the program was tested with python 3.7, use `virtualenv venv -p=/usr/bin/python3.7` to specify the python version
+    - Note: the program has been tested with python 3.7, use `virtualenv venv -p=/usr/bin/python3.7` to specify the python version
     - Note2: if you don't have venv installed, run `python3 -m pip install --user virtualenv`
 - Run `make build`
   - This command will build the Lucene-based jar, install python requirements, and build trec-eval.

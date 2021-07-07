@@ -84,7 +84,7 @@ def test():
     split_dict = {'train': 0.8, 'val': 0.1, 'test': 0.1}
     model_name = 'bert-base-uncased'
     tokenizer = AutoTokenizer.from_pretrained(model_name)  # download checkpoint for Bert Tokenizer
-    dm = ArgQualityDataset(5, tokenizer, split_dict, '../webis-argquality20-full.csv')
+    dm = ArgQualityDataset(5, tokenizer, split_dict, 'webis-argquality20-full.csv')
     dm.prepare_data()
     dm.setup()
     tr_lod = dm.train_dataloader()
